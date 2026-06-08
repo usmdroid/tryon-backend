@@ -1,0 +1,9 @@
+uz/tryon/api/TryonBackendApplication.class
+uz/tryon/api/RateLimiterService.class
+uz/tryon/api/ModalClient.class
+uz/tryon/api/TryOnController.class
+uz/tryon/api/CorsConfig.class
+uz/tryon/api/AppConfig.class
+uz/tryon/api/ModalClient$Result.class
+uz/tryon/api/ImageValidator$Result.class
+uz/tryon/api/ImageValidator.class

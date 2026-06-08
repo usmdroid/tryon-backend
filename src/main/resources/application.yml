@@ -1,0 +1,36 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: tryon-backend
+  servlet:
+    multipart:
+      max-request-size: 16MB
+      max-file-size: 16MB
+
+# Try-on sozlamalari — barchasi env o'zgaruvchilardan (lokalda default qiymatlar).
+# Production'da bularni platforma (Railway/Render) env sozlamalarida beriladi.
+tryon:
+  # Modal web endpoint (deploy qilingan)
+  modal-url: ${TRYON_MODAL_URL:https://elusm17--catvton-tryon-tryon-tryon-api.modal.run}
+
+  # Modal ichki secret (hozir Modal tarafida tekshiruv yo'q — keyin qo'shiladi)
+  modal-secret: ${TRYON_MODAL_SECRET:}
+
+  # Sotuvchi API kalitlari (vergul bilan). Demo uchun bitta test kalit.
+  # Production'da DB'dan yoki ko'proq kalit.
+  api-keys: ${TRYON_API_KEYS:test-key-12345}
+
+  # Ruxsat etilgan domenlar (vergul bilan). Bo'sh = hammasiga ruxsat (demo).
+  allowed-origins: ${TRYON_ALLOWED_ORIGINS:}
+
+  # Bir kalit uchun daqiqasiga maksimal so'rov
+  rate-limit-per-minute: ${TRYON_RATE_LIMIT:5}
+
+  # Maksimal rasm hajmi (bayt) — 8 MB
+  max-image-bytes: ${TRYON_MAX_IMAGE_BYTES:8388608}
+
+logging:
+  level:
+    uz.tryon.api: INFO
