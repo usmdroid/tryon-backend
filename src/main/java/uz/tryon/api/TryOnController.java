@@ -29,13 +29,16 @@ public class TryOnController {
     private final AppConfig config;
     private final RateLimiterService rateLimiter;
     private final ImageValidator validator;
+    private final ImageCheckService checkService;
     private final ModalClient modal;
 
     public TryOnController(AppConfig config, RateLimiterService rateLimiter,
-                           ImageValidator validator, ModalClient modal) {
+                           ImageValidator validator, ImageCheckService checkService,
+                           ModalClient modal) {
         this.config = config;
         this.rateLimiter = rateLimiter;
         this.validator = validator;
+        this.checkService = checkService;
         this.modal = modal;
     }
 
@@ -83,6 +86,34 @@ public class TryOnController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("image/webp"))
                 .body(result.image());
+    }
+
+    /**
+     * Rasm tekshiruvi — Modal'ga (GPU'ga) TEGMASDAN, rasm generatsiyaga yaroqliligini baholaydi.
+     * Frontenddagi "Tekshirish" tugmasi shuni chaqiradi; javobni log/Toast'ga aylantiradi.
+     *
+     * Kirish (JSON): { person_image: base64, cloth_type: "upper" }
+     * Header: X-Api-Key: <sotuvchi kaliti>
+     * Chiqish: CheckReport JSON (ok, checks[], summary).
+     *
+     * GPU xarajati yo'q, shuning uchun rate limit qo'llanmaydi (faqat API kalit tekshiriladi).
+     */
+    @PostMapping("/check")
+    public ResponseEntity<?> check(
+            @RequestHeader(value = "X-Api-Key", required = false) String apiKey,
+            @RequestBody Map<String, String> payload) {
+
+        if (apiKey == null || config.getApiKeys() == null || !config.getApiKeys().contains(apiKey)) {
+            return err(HttpStatus.UNAUTHORIZED, "API kalit noto'g'ri yoki yo'q.");
+        }
+
+        String person = payload.get("person_image");
+        String clothType = payload.getOrDefault("cloth_type", "upper");
+
+        CheckReport report = checkService.check(person, clothType);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(report);
     }
 
     /** Soddagina sog'liq tekshiruvi (deploy platformasi uchun). */

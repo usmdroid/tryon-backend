@@ -31,6 +31,43 @@ public class AppConfig {
     /** Maksimal rasm hajmi (bayt). Default 8 MB. */
     private long maxImageBytes = 8L * 1024 * 1024;
 
+    /** Sifat tekshiruvi chegaralari (POST /api/check uchun). */
+    private final Check check = new Check();
+
+    public Check getCheck() { return check; }
+
+    /**
+     * Rasm sifati tekshiruvi sozlamalari. Hammasi env orqali sozlanadi
+     * (masalan TRYON_CHECK_MIN_WIDTH), application.yml ga qarang.
+     */
+    public static class Check {
+        /** Minimal kenglik (px). Bundan kichik bo'lsa — rad. */
+        private int minWidth = 256;
+        /** Minimal balandlik (px). Bundan kichik bo'lsa — rad. */
+        private int minHeight = 256;
+        /** Blur chegarasi (Laplacian dispersiyasi). Bundan past — xira deb ogohlantirish. */
+        private double blurMin = 80.0;
+        /** Yorug'lik (o'rtacha yorqinlik 0..255) pastki chegarasi — bundan past = juda qorong'i. */
+        private int brightnessMin = 30;
+        /** Yorug'lik yuqori chegarasi — bundan baland = juda yorug'/yoritilgan. */
+        private int brightnessMax = 235;
+
+        public int getMinWidth() { return minWidth; }
+        public void setMinWidth(int v) { this.minWidth = v; }
+
+        public int getMinHeight() { return minHeight; }
+        public void setMinHeight(int v) { this.minHeight = v; }
+
+        public double getBlurMin() { return blurMin; }
+        public void setBlurMin(double v) { this.blurMin = v; }
+
+        public int getBrightnessMin() { return brightnessMin; }
+        public void setBrightnessMin(int v) { this.brightnessMin = v; }
+
+        public int getBrightnessMax() { return brightnessMax; }
+        public void setBrightnessMax(int v) { this.brightnessMax = v; }
+    }
+
     public String getModalUrl() { return modalUrl; }
     public void setModalUrl(String v) { this.modalUrl = v; }
 
