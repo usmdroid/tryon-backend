@@ -9,7 +9,10 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
+
+import static uz.tryon.api.PoseDetector.*;
 
 /**
  * Rasm generatsiyaga yaroqliligini tekshiradi — Modal'ga (GPU'ga) yubormasdan OLDIN.
@@ -28,10 +31,12 @@ public class ImageCheckService {
 
     private final AppConfig config;
     private final ImageValidator validator;
+    private final PoseDetector pose;
 
-    public ImageCheckService(AppConfig config, ImageValidator validator) {
+    public ImageCheckService(AppConfig config, ImageValidator validator, PoseDetector pose) {
         this.config = config;
         this.validator = validator;
+        this.pose = pose;
     }
 
     public CheckReport check(String personB64, String clothType) {
@@ -64,11 +69,8 @@ public class ImageCheckService {
         // 4. Xiralik (blur)
         checks.add(checkBlur(gray, w, h));
 
-        // 5–7. ML tekshiruvlari — keyingi bosqichlarda qo'shiladi
-        checks.add(CheckItem.skip("face_count", "Yuz soni", "Keyingi bosqichda (YuNet) qo'shiladi."));
-        checks.add(CheckItem.skip("pose", "Poza", "Keyingi bosqichda (MoveNet) qo'shiladi."));
-        checks.add(CheckItem.skip("body_coverage", "Tana ko'rinishi",
-                "Keyingi bosqichda (MoveNet, cloth_type'ga qarab) qo'shiladi."));
+        // 5–7. Poza asosidagi tekshiruvlar (MoveNet): yuz soni, poza, tana ko'rinishi
+        checks.addAll(poseChecks(img, clothType));
 
         return finish(clothType, checks);
     }
@@ -135,6 +137,124 @@ public class ImageCheckService {
                     "Rasm xira ko'rinadi (fokus o'lchovi " + Math.round(variance) + "). Aniqroq rasm tavsiya etiladi.");
         }
         return CheckItem.pass("blur", "Xiralik", "Rasm yetarlicha aniq (fokus o'lchovi " + Math.round(variance) + ").");
+    }
+
+    // ---- Poza asosidagi tekshiruvlar (MoveNet) ----
+
+    private List<CheckItem> poseChecks(BufferedImage img, String clothType) {
+        if (!pose.isReady()) {
+            return List.of(
+                    CheckItem.skip("face_count", "Yuz soni", "Poza modeli yuklanmagan."),
+                    CheckItem.skip("pose", "Poza", "Poza modeli yuklanmagan."),
+                    CheckItem.skip("body_coverage", "Tana ko'rinishi", "Poza modeli yuklanmagan."));
+        }
+
+        PoseDetector.PoseResult res = pose.detect(img);
+        double pmin = config.getCheck().getPersonScoreMin();
+        double kmin = config.getCheck().getKeypointScoreMin();
+
+        List<Person> people = res.persons().stream().filter(p -> p.boxScore() >= pmin).toList();
+        List<Person> faces = people.stream().filter(p -> faceVisible(p, kmin)).toList();
+
+        List<CheckItem> out = new ArrayList<>();
+
+        // Yuz soni
+        if (faces.isEmpty()) {
+            out.add(CheckItem.fail("face_count", "Yuz soni",
+                    "Rasmda yuz topilmadi. Old tomondan, yuzi ko'rinadigan rasm yuklang."));
+        } else if (faces.size() > 1) {
+            out.add(CheckItem.fail("face_count", "Yuz soni",
+                    "Rasmda bir nechta yuz topildi (" + faces.size() + "). Faqat bitta odam bo'lsin."));
+        } else {
+            out.add(CheckItem.pass("face_count", "Yuz soni", "Bitta yuz aniqlandi."));
+        }
+
+        // Subyekt: aniq bitta yuz bo'lsa o'sha, aks holda eng ishonchli odam
+        Person subject = faces.size() == 1 ? faces.get(0)
+                : people.stream().max(Comparator.comparingDouble(Person::boxScore)).orElse(null);
+
+        if (subject == null) {
+            out.add(CheckItem.fail("pose", "Poza", "Odam aniqlanmadi."));
+            out.add(CheckItem.fail("body_coverage", "Tana ko'rinishi", "Odam aniqlanmadi."));
+            return out;
+        }
+
+        out.add(poseCheck(subject, kmin));
+        out.add(coverageCheck(subject, clothType, kmin));
+        return out;
+    }
+
+    private boolean faceVisible(Person p, double k) {
+        Keypoint[] kp = p.keypoints();
+        return kp[NOSE].visible(k) && (kp[L_EYE].visible(k) || kp[R_EYE].visible(k));
+    }
+
+    /** Tik turibdimi / yotmaganmi / old tomondanmi. */
+    private CheckItem poseCheck(Person p, double k) {
+        Keypoint[] kp = p.keypoints();
+        int shoulders = (kp[L_SHOULDER].visible(k) ? 1 : 0) + (kp[R_SHOULDER].visible(k) ? 1 : 0);
+        int hips = (kp[L_HIP].visible(k) ? 1 : 0) + (kp[R_HIP].visible(k) ? 1 : 0);
+
+        if (shoulders == 0 || hips == 0) {
+            return CheckItem.warn("pose", "Poza",
+                    "Pozani aniq baholab bo'lmadi (yelka yoki bel ko'rinmadi).");
+        }
+
+        double shMidY = avg(kp, L_SHOULDER, R_SHOULDER, k, true);
+        double shMidX = avg(kp, L_SHOULDER, R_SHOULDER, k, false);
+        double hipMidY = avg(kp, L_HIP, R_HIP, k, true);
+        double hipMidX = avg(kp, L_HIP, R_HIP, k, false);
+
+        double dy = hipMidY - shMidY;          // tik turganda bel yelkadan pastda (dy > 0)
+        double dx = Math.abs(hipMidX - shMidX);
+
+        if (dy <= 0 || dx > dy) {
+            return CheckItem.fail("pose", "Poza",
+                    "Odam tik turmagan (yotgan yoki kuchli egilgan) ko'rinadi.");
+        }
+        if (shoulders == 1) {
+            return CheckItem.warn("pose", "Poza",
+                    "Yon tomondan turgan ko'rinadi. Old tomondan turish tavsiya etiladi.");
+        }
+        return CheckItem.pass("pose", "Poza", "Poza yaroqli (tik va old tomondan).");
+    }
+
+    /** cloth_type'ga qarab kerakli tana qismlari ko'rinyaptimi. */
+    private CheckItem coverageCheck(Person p, String clothType, double k) {
+        Keypoint[] kp = p.keypoints();
+        boolean bothShoulders = kp[L_SHOULDER].visible(k) && kp[R_SHOULDER].visible(k);
+        boolean anyShoulder = kp[L_SHOULDER].visible(k) || kp[R_SHOULDER].visible(k);
+        boolean hip = kp[L_HIP].visible(k) || kp[R_HIP].visible(k);
+        boolean knee = kp[L_KNEE].visible(k) || kp[R_KNEE].visible(k);
+        boolean ankle = kp[L_ANKLE].visible(k) || kp[R_ANKLE].visible(k);
+        String t = clothType == null ? "upper" : clothType.toLowerCase();
+
+        if (t.equals("upper")) {
+            return (bothShoulders && hip)
+                    ? CheckItem.pass("body_coverage", "Tana ko'rinishi", "Ustki tana ko'rinmoqda (yelkadan belgacha).")
+                    : CheckItem.fail("body_coverage", "Tana ko'rinishi",
+                    "Ustki kiyim uchun yelkadan belgacha ko'rinishi kerak.");
+        }
+        if (t.equals("lower")) {
+            return (hip && (knee || ankle))
+                    ? CheckItem.pass("body_coverage", "Tana ko'rinishi", "Pastki tana ko'rinmoqda (beldan oyoqgacha).")
+                    : CheckItem.fail("body_coverage", "Tana ko'rinishi",
+                    "Pastki kiyim uchun beldan oyoqgacha ko'rinishi kerak.");
+        }
+        // full / overall / dress / boshqa — butun bo'y kerak
+        return (anyShoulder && hip && (knee || ankle))
+                ? CheckItem.pass("body_coverage", "Tana ko'rinishi", "Butun tana ko'rinmoqda.")
+                : CheckItem.fail("body_coverage", "Tana ko'rinishi",
+                "Bu kiyim uchun butun bo'y (yelkadan oyoqgacha) ko'rinishi kerak.");
+    }
+
+    /** a va b nuqtalarning ko'rinadiganlari bo'yicha o'rtacha (yAxis=true → y, aks holda x). */
+    private double avg(Keypoint[] kp, int a, int b, double k, boolean yAxis) {
+        double sum = 0;
+        int n = 0;
+        if (kp[a].visible(k)) { sum += yAxis ? kp[a].y() : kp[a].x(); n++; }
+        if (kp[b].visible(k)) { sum += yAxis ? kp[b].y() : kp[b].x(); n++; }
+        return n == 0 ? 0 : sum / n;
     }
 
     // ---- Yordamchilar ----

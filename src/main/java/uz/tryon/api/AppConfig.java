@@ -45,12 +45,19 @@ public class AppConfig {
         private int minWidth = 256;
         /** Minimal balandlik (px). Bundan kichik bo'lsa — rad. */
         private int minHeight = 256;
-        /** Blur chegarasi (Laplacian dispersiyasi). Bundan past — xira deb ogohlantirish. */
-        private double blurMin = 80.0;
+        /** Blur chegarasi (Laplacian dispersiyasi). Bundan past — xira deb ogohlantirish.
+         *  Eslatma: butun rasm bo'yicha hisoblanadi, shuning uchun fon ko'p bo'lsa pasayadi —
+         *  heuristik qiymat, env orqali sozlanadi. */
+        private double blurMin = 10.0;
         /** Yorug'lik (o'rtacha yorqinlik 0..255) pastki chegarasi — bundan past = juda qorong'i. */
         private int brightnessMin = 30;
         /** Yorug'lik yuqori chegarasi — bundan baland = juda yorug'/yoritilgan. */
         private int brightnessMax = 235;
+
+        /** Odam (box) ishonch chegarasi — bundan past instanslar e'tiborsiz qoldiriladi. */
+        private double personScoreMin = 0.25;
+        /** Tana nuqtasi (keypoint) ko'rinish chegarasi — bundan past = nuqta ko'rinmaydi. */
+        private double keypointScoreMin = 0.30;
 
         public int getMinWidth() { return minWidth; }
         public void setMinWidth(int v) { this.minWidth = v; }
@@ -66,6 +73,12 @@ public class AppConfig {
 
         public int getBrightnessMax() { return brightnessMax; }
         public void setBrightnessMax(int v) { this.brightnessMax = v; }
+
+        public double getPersonScoreMin() { return personScoreMin; }
+        public void setPersonScoreMin(double v) { this.personScoreMin = v; }
+
+        public double getKeypointScoreMin() { return keypointScoreMin; }
+        public void setKeypointScoreMin(double v) { this.keypointScoreMin = v; }
     }
 
     public String getModalUrl() { return modalUrl; }

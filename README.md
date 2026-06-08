@@ -50,6 +50,40 @@ Body (JSON):
 
 Javob: `image/webp` (muvaffaqiyat) yoki JSON xato.
 
+### POST /api/check
+
+Modal'ga (GPU'ga) **tegmasdan** rasm generatsiyaga yaroqliligini tekshiradi.
+Frontenddagi "Tekshirish" tugmasi shuni chaqiradi.
+
+Header: `X-Api-Key: <kalit>`
+
+Body (JSON):
+```json
+{ "person_image": "<base64>", "cloth_type": "upper" }
+```
+
+Javob (JSON):
+```json
+{
+  "ok": true,
+  "clothType": "upper",
+  "summary": "Rasm generatsiyaga yaroqli.",
+  "checks": [
+    { "id": "resolution", "label": "Rezolyutsiya", "status": "pass", "message": "..." },
+    { "id": "face_count", "label": "Yuz soni",     "status": "pass", "message": "..." }
+  ]
+}
+```
+
+Tekshiruvlar: format/hajm, rezolyutsiya, yorug'lik, xiralik (sof Java) +
+yuz soni, poza, tana ko'rinishi (MoveNet MultiPose, ONNX — CPU).
+`status`: `pass` / `warn` (yaroqli, lekin sifat past) / `fail` (rad) / `skip`.
+`ok=false` faqat biror `fail` bo'lsa. GPU xarajati yo'q → rate limit qo'llanmaydi.
+
+Poza modeli: `src/main/resources/models/movenet-multipose.onnx` (~19 MB, Apache-2.0,
+[Xenova/movenet-multipose-lightning](https://huggingface.co/Xenova/movenet-multipose-lightning)).
+Server ishga tushganda bir marta yuklanadi.
+
 ## Deploy (Railway / Render)
 
 1. Bu papkani GitHub repo'ga yuklang.
@@ -61,7 +95,7 @@ Javob: `image/webp` (muvaffaqiyat) yoki JSON xato.
 ## Keyingi bosqichlar (backend dev uchun)
 
 - Imzolangan token (HMAC/JWT + nonce) qo'shish.
-- Yengil yuz/odam detektori (ImageValidator ichida TODO).
+- ✅ Yuz/poza/tana detektori — `/api/check` (MoveNet) qo'shildi.
 - PostgreSQL: API kalitlar va billing.
 - Modal tarafida secret tekshiruvini yoqish.
 - Rasm vaqtinchalik saqlash (S3/R2) + avtomatik o'chirish.
