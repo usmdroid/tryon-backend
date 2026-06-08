@@ -9,7 +9,7 @@ import java.util.Map;
 
 /**
  * Asosiy endpoint: POST /api/tryon
- *
+ * <p>
  * So'rov oqimi (tartib muhim — GPU'ga yetguncha filtrlash):
  *   1. API kalit tekshiruvi (header)
  *   2. Origin (domain) allowlist
@@ -17,7 +17,7 @@ import java.util.Map;
  *   4. Rasm validatsiyasi
  *   5. Modal'ga uzatish (ichki secret bilan)
  *   6. Natijani qaytarish
- *
+ * <p>
  * Kirish (JSON): { person_image: base64, cloth_image: base64, cloth_type: "upper" }
  * Header: X-Api-Key: <sotuvchi kaliti>
  * Chiqish: image/webp (muvaffaqiyat) yoki JSON xato
@@ -91,11 +91,11 @@ public class TryOnController {
     /**
      * Rasm tekshiruvi — Modal'ga (GPU'ga) TEGMASDAN, rasm generatsiyaga yaroqliligini baholaydi.
      * Frontenddagi "Tekshirish" tugmasi shuni chaqiradi; javobni log/Toast'ga aylantiradi.
-     *
+     * <p>
      * Kirish (JSON): { person_image: base64, cloth_type: "upper" }
      * Header: X-Api-Key: <sotuvchi kaliti>
      * Chiqish: CheckReport JSON (ok, checks[], summary).
-     *
+     * <p>
      * GPU xarajati yo'q, shuning uchun rate limit qo'llanmaydi (faqat API kalit tekshiriladi).
      */
     @PostMapping("/check")
