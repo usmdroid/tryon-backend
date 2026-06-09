@@ -158,19 +158,23 @@ public class ImageCheckService {
 
         List<CheckItem> out = new ArrayList<>();
 
-        // Yuz soni
-        if (faces.isEmpty()) {
+        // Yuz/odam soni — avval gavda (odam) bo'yicha sanaymiz, keyin yuz ko'rinishi.
+        // Shunda yuzi ko'rinmaydigan 2-odam ham aniqlanadi.
+        if (people.size() > 1) {
             out.add(CheckItem.fail("face_count", "Yuz soni",
-                    "Rasmda yuz topilmadi. Old tomondan, yuzi ko'rinadigan rasm yuklang."));
-        } else if (faces.size() > 1) {
+                    "Rasmda bir nechta odam topildi (" + people.size() + "). Faqat bitta odam bo'lsin."));
+        } else if (people.isEmpty()) {
             out.add(CheckItem.fail("face_count", "Yuz soni",
-                    "Rasmda bir nechta yuz topildi (" + faces.size() + "). Faqat bitta odam bo'lsin."));
+                    "Rasmda odam topilmadi. Butun gavda, old tomondan olingan rasm yuklang."));
+        } else if (faces.isEmpty()) {
+            out.add(CheckItem.fail("face_count", "Yuz soni",
+                    "Odam yuzi ko'rinmadi. Old tomondan, yuzi ko'rinadigan rasm yuklang."));
         } else {
-            out.add(CheckItem.pass("face_count", "Yuz soni", "Bitta yuz aniqlandi."));
+            out.add(CheckItem.pass("face_count", "Yuz soni", "Bitta odam aniqlandi."));
         }
 
-        // Subyekt: aniq bitta yuz bo'lsa o'sha, aks holda eng ishonchli odam
-        Person subject = faces.size() == 1 ? faces.get(0)
+        // Subyekt: aniq bitta odam bo'lsa o'sha, aks holda eng ishonchli odam
+        Person subject = people.size() == 1 ? people.get(0)
                 : people.stream().max(Comparator.comparingDouble(Person::boxScore)).orElse(null);
 
         if (subject == null) {
