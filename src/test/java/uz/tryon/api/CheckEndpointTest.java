@@ -79,14 +79,18 @@ class CheckEndpointTest {
     }
 
     @Test
-    void juentaKichikRasm_okFalse() throws Exception {
+    void juentaKichikRasm_okFalse_failFast() throws Exception {
+        // Rezolyutsiya fail bo'lsa, ketma-ketlik shu yerda to'xtaydi:
+        // odam soni / poza tekshiruvlari UMUMAN bo'lmasligi kerak (fail-fast).
         mvc.perform(post("/api/check")
                         .header("X-Api-Key", API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body(noisyPng(64, 64), "upper")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ok").value(false))
-                .andExpect(jsonPath("$.checks[?(@.id=='resolution')].status").value("fail"));
+                .andExpect(jsonPath("$.checks[?(@.id=='resolution')].status").value("fail"))
+                .andExpect(jsonPath("$.checks[?(@.id=='face_count')]").isEmpty())
+                .andExpect(jsonPath("$.checks[?(@.id=='pose')]").isEmpty());
     }
 
     @Test

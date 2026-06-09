@@ -42,10 +42,18 @@ public class ImageCheckService {
         this.personDetector = personDetector;
     }
 
+    /**
+     * Tekshiruvlar PRIORITET bo'yicha KETMA-KET (fail-fast):
+     * biror tekshiruv "fail" qaytarsa, keyingilari (ayniqsa qimmat ML) BAJARILMAYDI.
+     * Tartib: arzon + fundamental → qimmat.
+     *   1. Format/hajm  2. Dekod  3. Rezolyutsiya
+     *   (yorug'lik, xiralik — faqat ogohlantirish, zanjirni to'xtatmaydi)
+     *   4. Odam soni (YOLO)  5. Poza (MoveNet)  6. Tana ko'rinishi (MoveNet)
+     */
     public CheckReport check(String personB64, String clothType) {
         List<CheckItem> checks = new ArrayList<>();
 
-        // 1. Format va hajm (arzon tekshiruv — ImageValidator'ni qayta ishlatamiz)
+        // 1. Format va hajm
         ImageValidator.Result fmt = validator.validate(personB64);
         if (!fmt.ok()) {
             checks.add(CheckItem.fail("format", "Format/hajm", fmt.reason()));
@@ -53,7 +61,7 @@ public class ImageCheckService {
         }
         checks.add(CheckItem.pass("format", "Format/hajm", "Format va hajm joyida."));
 
-        // Rasmni piksellargacha dekod qilish
+        // 2. Dekod
         BufferedImage img = decode(personB64);
         if (img == null) {
             checks.add(CheckItem.fail("decode", "Rasmni o'qish",
@@ -65,17 +73,26 @@ public class ImageCheckService {
         int h = img.getHeight();
         int[] gray = toGrayscale(img);
 
-        // 2. Rezolyutsiya
-        checks.add(checkResolution(w, h));
-        // 3. Yorug'lik
-        checks.add(checkBrightness(gray));
-        // 4. Xiralik (blur)
-        checks.add(checkBlur(gray, w, h));
+        // 3. Rezolyutsiya — fail bo'lsa, ML'ga bormaymiz
+        if (add(checks, checkResolution(w, h))) return finish(clothType, checks);
 
-        // 5–7. Odam soni (YOLO) + poza/tana ko'rinishi (MoveNet)
-        checks.addAll(bodyChecks(img, clothType));
+        // Yorug'lik va xiralik — maslahat (warn), zanjirni to'xtatmaydi
+        add(checks, checkBrightness(gray));
+        add(checks, checkBlur(gray, w, h));
+
+        // 4. Odam soni (YOLO) — fail bo'lsa, MoveNet ishlamaydi
+        if (add(checks, personCountCheck(img))) return finish(clothType, checks);
+
+        // 5–6. Poza + tana ko'rinishi (MoveNet)
+        addPoseAndCoverage(checks, img, clothType);
 
         return finish(clothType, checks);
+    }
+
+    /** Tekshiruvni ro'yxatga qo'shadi; "fail" bo'lsa true qaytaradi (zanjirni to'xtatish signali). */
+    private boolean add(List<CheckItem> checks, CheckItem item) {
+        checks.add(item);
+        return item.isFail();
     }
 
     private CheckReport finish(String clothType, List<CheckItem> checks) {
@@ -144,33 +161,29 @@ public class ImageCheckService {
 
     // ---- Odam (YOLO) + poza/tana (MoveNet) tekshiruvlari ----
 
-    private List<CheckItem> bodyChecks(BufferedImage img, String clothType) {
-        List<CheckItem> out = new ArrayList<>();
-
-        // 1) Odam soni — YOLOv8 (real fotolarda ishonchli)
+    /** Odam soni — YOLOv8 (real fotolarda ishonchli). */
+    private CheckItem personCountCheck(BufferedImage img) {
         if (!personDetector.isReady()) {
-            out.add(CheckItem.skip("face_count", "Odam soni", "Odam detektori yuklanmagan."));
-        } else {
-            int n = personDetector.detect(img).size();
-            if (n == 0) {
-                out.add(CheckItem.fail("face_count", "Odam soni",
-                        "Rasmda odam topilmadi. Butun gavda, old tomondan olingan haqiqiy foto yuklang."));
-                out.add(CheckItem.fail("pose", "Poza", "Odam aniqlanmadi."));
-                out.add(CheckItem.fail("body_coverage", "Tana ko'rinishi", "Odam aniqlanmadi."));
-                return out; // odam yo'q — poza/tana ma'nosiz
-            } else if (n > 1) {
-                out.add(CheckItem.fail("face_count", "Odam soni",
-                        "Rasmda bir nechta odam topildi (" + n + "). Faqat bitta odam bo'lsin."));
-            } else {
-                out.add(CheckItem.pass("face_count", "Odam soni", "Bitta odam aniqlandi."));
-            }
+            return CheckItem.skip("face_count", "Odam soni", "Odam detektori yuklanmagan.");
         }
+        int n = personDetector.detect(img).size();
+        if (n == 0) {
+            return CheckItem.fail("face_count", "Odam soni",
+                    "Rasmda odam topilmadi. Butun gavda, old tomondan olingan haqiqiy foto yuklang.");
+        }
+        if (n > 1) {
+            return CheckItem.fail("face_count", "Odam soni",
+                    "Rasmda bir nechta odam topildi (" + n + "). Faqat bitta odam bo'lsin.");
+        }
+        return CheckItem.pass("face_count", "Odam soni", "Bitta odam aniqlandi.");
+    }
 
-        // 2) Poza va tana ko'rinishi — MoveNet keypoint'lari
+    /** Poza va tana ko'rinishi — MoveNet keypoint'lari (poza fail bo'lsa, coverage o'tkazib yuboriladi). */
+    private void addPoseAndCoverage(List<CheckItem> checks, BufferedImage img, String clothType) {
         if (!pose.isReady()) {
-            out.add(CheckItem.skip("pose", "Poza", "Poza modeli yuklanmagan."));
-            out.add(CheckItem.skip("body_coverage", "Tana ko'rinishi", "Poza modeli yuklanmagan."));
-            return out;
+            checks.add(CheckItem.skip("pose", "Poza", "Poza modeli yuklanmagan."));
+            checks.add(CheckItem.skip("body_coverage", "Tana ko'rinishi", "Poza modeli yuklanmagan."));
+            return;
         }
         double pmin = config.getCheck().getPersonScoreMin();
         double kmin = config.getCheck().getKeypointScoreMin();
@@ -180,14 +193,13 @@ public class ImageCheckService {
                 .orElse(null);
 
         if (subject == null) {
-            out.add(CheckItem.warn("pose", "Poza", "Poza nuqtalari topilmadi (poza baholanmadi)."));
-            out.add(CheckItem.warn("body_coverage", "Tana ko'rinishi", "Tana nuqtalari topilmadi."));
-            return out;
+            checks.add(CheckItem.warn("pose", "Poza", "Poza nuqtalari topilmadi (poza baholanmadi)."));
+            checks.add(CheckItem.warn("body_coverage", "Tana ko'rinishi", "Tana nuqtalari topilmadi."));
+            return;
         }
 
-        out.add(poseCheck(subject, kmin));
-        out.add(coverageCheck(subject, clothType, kmin));
-        return out;
+        if (add(checks, poseCheck(subject, kmin))) return; // poza fail → tana ko'rinishi o'tkazib yuboriladi
+        checks.add(coverageCheck(subject, clothType, kmin));
     }
 
     /** Tik turibdimi / yotmaganmi / old tomondanmi. */
