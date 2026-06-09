@@ -76,13 +76,17 @@ Javob (JSON):
 ```
 
 Tekshiruvlar: format/hajm, rezolyutsiya, yorug'lik, xiralik (sof Java) +
-yuz soni, poza, tana ko'rinishi (MoveNet MultiPose, ONNX — CPU).
+odam soni (YOLOv8), poza va tana ko'rinishi (MoveNet MultiPose). Hammasi ONNX, CPU.
 `status`: `pass` / `warn` (yaroqli, lekin sifat past) / `fail` (rad) / `skip`.
 `ok=false` faqat biror `fail` bo'lsa. GPU xarajati yo'q → rate limit qo'llanmaydi.
 
-Poza modeli: `src/main/resources/models/movenet-multipose.onnx` (~19 MB, Apache-2.0,
-[Xenova/movenet-multipose-lightning](https://huggingface.co/Xenova/movenet-multipose-lightning)).
-Server ishga tushganda bir marta yuklanadi.
+Modellar (`src/main/resources/models/`, server startda bir marta yuklanadi):
+- `yolov8n.onnx` (~13 MB) — odam soni. [Kalray/yolov8](https://huggingface.co/Kalray/yolov8)
+- `movenet-multipose.onnx` (~19 MB) — poza/tana. Apache-2.0,
+  [Xenova/movenet-multipose-lightning](https://huggingface.co/Xenova/movenet-multipose-lightning)
+
+Eslatma: detektorlar haqiqiy fotosuratlar uchun. Ikona/multik kabi tekis rasmlar
+"odam topilmadi" deb rad etiladi (kutilgan).
 
 ## Deploy (Railway / Render)
 
