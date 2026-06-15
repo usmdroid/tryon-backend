@@ -53,6 +53,10 @@ tryon:
   token-secret: ${TRYON_TOKEN_SECRET:dev-secret-change-me}
   token-ttl-seconds: ${TRYON_TOKEN_TTL_SECONDS:300}
 
+  # OTP (telefon tasdiqlash). otp-fixed-code bo'sh = tasodifiy kod (production).
+  otp-ttl-seconds: ${TRYON_OTP_TTL_SECONDS:300}
+  otp-fixed-code: ${TRYON_OTP_FIXED_CODE:}
+
   # Rasm sifati tekshiruvi (POST /api/check) chegaralari
   check:
     min-width: ${TRYON_CHECK_MIN_WIDTH:256}

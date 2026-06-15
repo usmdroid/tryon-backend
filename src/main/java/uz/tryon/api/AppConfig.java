@@ -37,6 +37,12 @@ public class AppConfig {
     /** Sessiya tokeni amal qilish muddati (soniya). Default 5 daqiqa. */
     private long tokenTtlSeconds = 300;
 
+    /** OTP kod amal qilish muddati (soniya). Default 5 daqiqa. */
+    private long otpTtlSeconds = 300;
+
+    /** Dev/test uchun qat'iy OTP kod (bo'sh = tasodifiy). Production'da bo'sh qoldiriladi. */
+    private String otpFixedCode = "";
+
     /** Sifat tekshiruvi chegaralari (POST /api/check uchun). */
     private final Check check = new Check();
 
@@ -110,4 +116,10 @@ public class AppConfig {
 
     public long getTokenTtlSeconds() { return tokenTtlSeconds; }
     public void setTokenTtlSeconds(long v) { this.tokenTtlSeconds = v; }
+
+    public long getOtpTtlSeconds() { return otpTtlSeconds; }
+    public void setOtpTtlSeconds(long v) { this.otpTtlSeconds = v; }
+
+    public String getOtpFixedCode() { return otpFixedCode; }
+    public void setOtpFixedCode(String v) { this.otpFixedCode = v; }
 }

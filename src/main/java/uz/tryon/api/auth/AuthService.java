@@ -39,7 +39,7 @@ public class AuthService {
 
     /** Telefon majburiy va unik; email ixtiyoriy (berilsa unik). */
     public Client register(String name, String phone, String email, String password) {
-        String normPhone = normalizePhone(phone);
+        String normPhone = Phones.normalize(phone);
         if (clients.existsByPhone(normPhone)) {
             throw new PhoneAlreadyExistsException();
         }
@@ -53,17 +53,12 @@ public class AuthService {
     /** identifier — email yoki telefon. */
     public Client login(String identifier, String password) {
         String id = identifier.trim();
-        Client c = clients.findByEmailOrPhone(id.toLowerCase(), normalizePhone(id))
+        Client c = clients.findByEmailOrPhone(id.toLowerCase(), Phones.normalize(id))
                 .orElseThrow(InvalidCredentialsException::new);
         if (!encoder.matches(password, c.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
         return c;
-    }
-
-    /** Telefonni soddalashtiradi: bo'sh joy, tire, qavslarni olib tashlaydi. */
-    private static String normalizePhone(String phone) {
-        return phone == null ? "" : phone.replaceAll("[\\s\\-()]", "");
     }
 
     /** Dashboard sessiya tokeni (imzolangan, 7 kun). */

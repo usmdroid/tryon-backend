@@ -21,13 +21,30 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService auth;
+    private final OtpService otp;
 
-    public AuthController(AuthService auth) {
+    public AuthController(AuthService auth, OtpService otp) {
         this.auth = auth;
+        this.otp = otp;
     }
 
-    public record RegisterRequest(String name, String phone, String email, String password) { }
+    public record SendOtpRequest(String phone) { }
+    public record RegisterRequest(String name, String phone, String email, String password, String code) { }
     public record LoginRequest(String identifier, String password) { }
+
+    /** Telefonga tasdiqlash kodi yuboradi (registratsiyadan oldin). */
+    @PostMapping("/send-otp")
+    public ResponseEntity<?> sendOtp(@RequestBody SendOtpRequest req) {
+        if (isBlank(req.phone())) {
+            return err(HttpStatus.BAD_REQUEST, "Telefon raqam kiritilishi shart.");
+        }
+        try {
+            otp.sendCode(req.phone());
+            return ResponseEntity.ok(Map.of("message", "Tasdiqlash kodi yuborildi."));
+        } catch (OtpService.TooSoonException e) {
+            return err(HttpStatus.TOO_MANY_REQUESTS, "Kod yaqinda yuborilgan. Biroz kuting.");
+        }
+    }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
@@ -36,6 +53,9 @@ public class AuthController {
         }
         if (req.password().length() < 6) {
             return err(HttpStatus.BAD_REQUEST, "Parol kamida 6 belgidan iborat bo'lsin.");
+        }
+        if (!otp.verify(req.phone(), req.code())) {
+            return err(HttpStatus.BAD_REQUEST, "Tasdiqlash kodi noto'g'ri yoki muddati o'tgan.");
         }
         try {
             Client c = auth.register(req.name(), req.phone(), req.email(), req.password());

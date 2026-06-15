@@ -11,3 +11,7 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
+
+# Test/dev: OTP kodi doim shu (LogSender'dan o'qishsiz test qilish uchun)
+tryon:
+  otp-fixed-code: "123456"
