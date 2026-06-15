@@ -22,10 +22,12 @@ public class AuthController {
 
     private final AuthService auth;
     private final OtpService otp;
+    private final uz.tryon.api.AppConfig config;
 
-    public AuthController(AuthService auth, OtpService otp) {
+    public AuthController(AuthService auth, OtpService otp, uz.tryon.api.AppConfig config) {
         this.auth = auth;
         this.otp = otp;
+        this.config = config;
     }
 
     public record SendOtpRequest(String phone) { }
@@ -39,8 +41,11 @@ public class AuthController {
             return err(HttpStatus.BAD_REQUEST, "Telefon raqam kiritilishi shart.");
         }
         try {
-            otp.sendCode(req.phone());
-            return ResponseEntity.ok(Map.of("message", "Tasdiqlash kodi yuborildi."));
+            String code = otp.sendCode(req.phone());
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("message", "Tasdiqlash kodi yuborildi.");
+            if (config.isOtpExposeCode()) body.put("devCode", code); // faqat dev flag yoqilganda
+            return ResponseEntity.ok(body);
         } catch (OtpService.TooSoonException e) {
             return err(HttpStatus.TOO_MANY_REQUESTS, "Kod yaqinda yuborilgan. Biroz kuting.");
         }

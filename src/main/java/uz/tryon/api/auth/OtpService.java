@@ -48,8 +48,8 @@ public class OtpService {
         }
     }
 
-    /** Kod yaratib telefonga yuboradi. Juda tez-tez so'ralsa — TooSoonException. */
-    public void sendCode(String phone) {
+    /** Kod yaratib telefonga yuboradi va kodni qaytaradi. Juda tez-tez so'ralsa — TooSoonException. */
+    public String sendCode(String phone) {
         String p = Phones.normalize(phone);
         long now = System.currentTimeMillis();
         String fixed = config.getOtpFixedCode();
@@ -64,6 +64,7 @@ public class OtpService {
                 : String.format("%06d", random.nextInt(1_000_000));
         store.put(p, new Entry(code, now + config.getOtpTtlSeconds() * 1000, now));
         sender.send(p, code);
+        return code;
     }
 
     /** Kodni tekshiradi; to'g'ri bo'lsa "iste'mol" qilinadi (qayta ishlatilmaydi). */

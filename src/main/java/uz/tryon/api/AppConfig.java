@@ -43,6 +43,9 @@ public class AppConfig {
     /** Dev/test uchun qat'iy OTP kod (bo'sh = tasodifiy). Production'da bo'sh qoldiriladi. */
     private String otpFixedCode = "";
 
+    /** Dev: true bo'lsa send-otp javobida kod ham qaytadi (frontend toast uchun). Production'da false! */
+    private boolean otpExposeCode = false;
+
     /** Sifat tekshiruvi chegaralari (POST /api/check uchun). */
     private final Check check = new Check();
 
@@ -122,4 +125,7 @@ public class AppConfig {
 
     public String getOtpFixedCode() { return otpFixedCode; }
     public void setOtpFixedCode(String v) { this.otpFixedCode = v; }
+
+    public boolean isOtpExposeCode() { return otpExposeCode; }
+    public void setOtpExposeCode(boolean v) { this.otpExposeCode = v; }
 }
