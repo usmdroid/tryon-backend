@@ -31,26 +31,62 @@ public class TryOnController {
     private final ImageValidator validator;
     private final ImageCheckService checkService;
     private final ModalClient modal;
+    private final TokenService tokenService;
 
     public TryOnController(AppConfig config, RateLimiterService rateLimiter,
                            ImageValidator validator, ImageCheckService checkService,
-                           ModalClient modal) {
+                           ModalClient modal, TokenService tokenService) {
         this.config = config;
         this.rateLimiter = rateLimiter;
         this.validator = validator;
         this.checkService = checkService;
         this.modal = modal;
+        this.tokenService = tokenService;
+    }
+
+    /**
+     * Sessiya tokenini zarb qiladi — buni DO'KON SERVERI chaqiradi (server-server, sk_ bilan).
+     * Token brauzerga beriladi va /api/tryon da Bearer sifatida ishlatiladi.
+     *
+     * Header: X-Api-Key: <sk_>  ·  Javob: { "token": "...", "expiresIn": 300 }
+     */
+    @PostMapping("/session")
+    public ResponseEntity<?> session(@RequestHeader(value = "X-Api-Key", required = false) String apiKey) {
+        if (apiKey == null || config.getApiKeys() == null || !config.getApiKeys().contains(apiKey)) {
+            return err(HttpStatus.UNAUTHORIZED, "API kalit noto'g'ri yoki yo'q.");
+        }
+        TokenService.Issued issued = tokenService.mint(apiKey);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("token", issued.token(), "expiresIn", issued.expiresInSeconds()));
+    }
+
+    /**
+     * So'rovni autentifikatsiya qiladi — Bearer token (afzal) yoki X-Api-Key (moslik uchun).
+     * Yaroqli bo'lsa clientId qaytaradi (rate-limit/identifikatsiya uchun), aks holda null.
+     * @param consumeToken Bearer token bir martalik ishlatilsinmi (qimmat amal — /tryon uchun true).
+     */
+    private String authenticate(String apiKey, String authHeader, boolean consumeToken) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return tokenService.verify(authHeader.substring(7).trim(), consumeToken).orElse(null);
+        }
+        if (apiKey != null && config.getApiKeys() != null && config.getApiKeys().contains(apiKey)) {
+            return tokenService.clientId(apiKey);
+        }
+        return null;
     }
 
     @PostMapping("/tryon")
     public ResponseEntity<?> tryOn(
             @RequestHeader(value = "X-Api-Key", required = false) String apiKey,
+            @RequestHeader(value = "Authorization", required = false) String auth,
             @RequestHeader(value = "Origin", required = false) String origin,
             @RequestBody Map<String, String> payload) {
 
-        // 1. API kalit
-        if (apiKey == null || config.getApiKeys() == null || !config.getApiKeys().contains(apiKey)) {
-            return err(HttpStatus.UNAUTHORIZED, "API kalit noto'g'ri yoki yo'q.");
+        // 1. Autentifikatsiya — Bearer token (bir martali) yoki X-Api-Key
+        String clientId = authenticate(apiKey, auth, true);
+        if (clientId == null) {
+            return err(HttpStatus.UNAUTHORIZED, "Token yoki API kalit noto'g'ri, muddati o'tgan yoki ishlatilgan.");
         }
 
         // 2. Origin (domain) allowlist — agar ro'yxat bo'sh bo'lmasa tekshiramiz
@@ -60,8 +96,8 @@ public class TryOnController {
             }
         }
 
-        // 3. Rate limit
-        if (!rateLimiter.allow(apiKey)) {
+        // 3. Rate limit (clientId bo'yicha)
+        if (!rateLimiter.allow(clientId)) {
             return err(HttpStatus.TOO_MANY_REQUESTS, "So'rovlar chegarasi oshdi. Birozdan keyin urinib ko'ring.");
         }
 
@@ -101,10 +137,12 @@ public class TryOnController {
     @PostMapping("/check")
     public ResponseEntity<?> check(
             @RequestHeader(value = "X-Api-Key", required = false) String apiKey,
+            @RequestHeader(value = "Authorization", required = false) String auth,
             @RequestBody Map<String, String> payload) {
 
-        if (apiKey == null || config.getApiKeys() == null || !config.getApiKeys().contains(apiKey)) {
-            return err(HttpStatus.UNAUTHORIZED, "API kalit noto'g'ri yoki yo'q.");
+        // Bearer token (consume QILMAYDI — arzon amal) yoki X-Api-Key
+        if (authenticate(apiKey, auth, false) == null) {
+            return err(HttpStatus.UNAUTHORIZED, "Token yoki API kalit noto'g'ri yoki muddati o'tgan.");
         }
 
         String person = payload.get("person_image");

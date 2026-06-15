@@ -31,6 +31,10 @@ tryon:
   # Maksimal rasm hajmi (bayt) — 8 MB
   max-image-bytes: ${TRYON_MAX_IMAGE_BYTES:8388608}
 
+  # Sessiya tokeni (HMAC imzo) — Production'da TRYON_TOKEN_SECRET ni albatta o'rnating
+  token-secret: ${TRYON_TOKEN_SECRET:dev-secret-change-me}
+  token-ttl-seconds: ${TRYON_TOKEN_TTL_SECONDS:300}
+
   # Rasm sifati tekshiruvi (POST /api/check) chegaralari
   check:
     min-width: ${TRYON_CHECK_MIN_WIDTH:256}

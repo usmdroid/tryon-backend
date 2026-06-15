@@ -50,6 +50,18 @@ Body (JSON):
 
 Javob: `image/webp` (muvaffaqiyat) yoki JSON xato.
 
+### POST /api/session
+
+Sessiya tokenini zarb qiladi — buni **do'kon serveri** (server-server, `sk_` bilan) chaqiradi.
+Token brauzerga beriladi va `/api/tryon`da `Authorization: Bearer <token>` sifatida ishlatiladi.
+
+Header: `X-Api-Key: <sk_>` → Javob: `{ "token": "...", "expiresIn": 300 }`
+
+Token: HMAC-SHA256 imzolangan (shifrlanmagan — ichida sir yo'q), qisqa muddatli (TTL),
+bir martali (nonce). `sk_` token ichiga tushmaydi (clientId = kalit xeshi).
+`/api/tryon` tokenni **bir marta** ishlatadi (consume); `/api/check` ishlatmaydi (arzon amal).
+`/api/tryon` va `/api/check` eski `X-Api-Key`ni ham qabul qiladi (moslik).
+
 ### POST /api/check
 
 Modal'ga (GPU'ga) **tegmasdan** rasm generatsiyaga yaroqliligini tekshiradi.

@@ -31,6 +31,12 @@ public class AppConfig {
     /** Maksimal rasm hajmi (bayt). Default 8 MB. */
     private long maxImageBytes = 8L * 1024 * 1024;
 
+    /** Sessiya tokenini imzolash maxfiy kaliti (HMAC). Production'da albatta env orqali o'zgartiriladi. */
+    private String tokenSecret = "dev-secret-change-me";
+
+    /** Sessiya tokeni amal qilish muddati (soniya). Default 5 daqiqa. */
+    private long tokenTtlSeconds = 300;
+
     /** Sifat tekshiruvi chegaralari (POST /api/check uchun). */
     private final Check check = new Check();
 
@@ -98,4 +104,10 @@ public class AppConfig {
 
     public long getMaxImageBytes() { return maxImageBytes; }
     public void setMaxImageBytes(long v) { this.maxImageBytes = v; }
+
+    public String getTokenSecret() { return tokenSecret; }
+    public void setTokenSecret(String v) { this.tokenSecret = v; }
+
+    public long getTokenTtlSeconds() { return tokenTtlSeconds; }
+    public void setTokenTtlSeconds(long v) { this.tokenTtlSeconds = v; }
 }
