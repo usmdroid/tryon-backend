@@ -26,20 +26,22 @@ public class AuthController {
         this.auth = auth;
     }
 
-    public record RegisterRequest(String name, String email, String password) { }
-    public record LoginRequest(String email, String password) { }
+    public record RegisterRequest(String name, String phone, String email, String password) { }
+    public record LoginRequest(String identifier, String password) { }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
-        if (isBlank(req.name()) || isBlank(req.email()) || isBlank(req.password())) {
-            return err(HttpStatus.BAD_REQUEST, "Nom, email va parol to'ldirilishi shart.");
+        if (isBlank(req.name()) || isBlank(req.phone()) || isBlank(req.password())) {
+            return err(HttpStatus.BAD_REQUEST, "Do'kon nomi, telefon va parol to'ldirilishi shart.");
         }
         if (req.password().length() < 6) {
             return err(HttpStatus.BAD_REQUEST, "Parol kamida 6 belgidan iborat bo'lsin.");
         }
         try {
-            Client c = auth.register(req.name(), req.email(), req.password());
+            Client c = auth.register(req.name(), req.phone(), req.email(), req.password());
             return ok(c);
+        } catch (AuthService.PhoneAlreadyExistsException e) {
+            return err(HttpStatus.CONFLICT, "Bu telefon raqam allaqachon ro'yxatdan o'tgan.");
         } catch (AuthService.EmailAlreadyExistsException e) {
             return err(HttpStatus.CONFLICT, "Bu email allaqachon ro'yxatdan o'tgan.");
         }
@@ -47,26 +49,26 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest req) {
-        if (isBlank(req.email()) || isBlank(req.password())) {
-            return err(HttpStatus.BAD_REQUEST, "Email va parol to'ldirilishi shart.");
+        if (isBlank(req.identifier()) || isBlank(req.password())) {
+            return err(HttpStatus.BAD_REQUEST, "Telefon/email va parol to'ldirilishi shart.");
         }
         try {
-            Client c = auth.login(req.email(), req.password());
+            Client c = auth.login(req.identifier(), req.password());
             return ok(c);
         } catch (AuthService.InvalidCredentialsException e) {
-            return err(HttpStatus.UNAUTHORIZED, "Email yoki parol noto'g'ri.");
+            return err(HttpStatus.UNAUTHORIZED, "Telefon/email yoki parol noto'g'ri.");
         }
     }
 
     private ResponseEntity<?> ok(Client c) {
+        Map<String, String> client = new java.util.HashMap<>();
+        client.put("id", c.getId().toString());
+        client.put("name", c.getName());
+        client.put("phone", c.getPhone());
+        client.put("email", c.getEmail()); // null bo'lishi mumkin — HashMap ruxsat beradi
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(
-                        "token", auth.issueSessionToken(c),
-                        "client", Map.of(
-                                "id", c.getId().toString(),
-                                "name", c.getName(),
-                                "email", c.getEmail())));
+                .body(Map.of("token", auth.issueSessionToken(c), "client", client));
     }
 
     private static boolean isBlank(String s) {

@@ -34,23 +34,36 @@ public class AuthService {
     }
 
     public static class EmailAlreadyExistsException extends RuntimeException { }
+    public static class PhoneAlreadyExistsException extends RuntimeException { }
     public static class InvalidCredentialsException extends RuntimeException { }
 
-    public Client register(String name, String email, String password) {
-        String normalized = email.trim().toLowerCase();
-        if (clients.existsByEmail(normalized)) {
+    /** Telefon majburiy va unik; email ixtiyoriy (berilsa unik). */
+    public Client register(String name, String phone, String email, String password) {
+        String normPhone = normalizePhone(phone);
+        if (clients.existsByPhone(normPhone)) {
+            throw new PhoneAlreadyExistsException();
+        }
+        String normEmail = (email == null || email.isBlank()) ? null : email.trim().toLowerCase();
+        if (normEmail != null && clients.existsByEmail(normEmail)) {
             throw new EmailAlreadyExistsException();
         }
-        return clients.save(new Client(name.trim(), normalized, encoder.encode(password)));
+        return clients.save(new Client(name.trim(), normPhone, normEmail, encoder.encode(password)));
     }
 
-    public Client login(String email, String password) {
-        Client c = clients.findByEmail(email.trim().toLowerCase())
+    /** identifier — email yoki telefon. */
+    public Client login(String identifier, String password) {
+        String id = identifier.trim();
+        Client c = clients.findByEmailOrPhone(id.toLowerCase(), normalizePhone(id))
                 .orElseThrow(InvalidCredentialsException::new);
         if (!encoder.matches(password, c.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
         return c;
+    }
+
+    /** Telefonni soddalashtiradi: bo'sh joy, tire, qavslarni olib tashlaydi. */
+    private static String normalizePhone(String phone) {
+        return phone == null ? "" : phone.replaceAll("[\\s\\-()]", "");
     }
 
     /** Dashboard sessiya tokeni (imzolangan, 7 kun). */
