@@ -9,6 +9,24 @@ spring:
       max-request-size: 16MB
       max-file-size: 16MB
 
+  # PostgreSQL — Railway PG* o'zgaruvchilaridan (lokalda localhost default).
+  # Railway: backend servisiga Postgres'ning PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD
+  # o'zgaruvchilarini reference qiling (yoki SPRING_DATASOURCE_URL ni bering).
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:sima}}
+    username: ${PGUSER:sima}
+    password: ${PGPASSWORD:sima}
+  jpa:
+    hibernate:
+      ddl-auto: none   # sxemani to'liq Flyway boshqaradi (Hibernate o'zgartirmaydi/tekshirmaydi)
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
 # Try-on sozlamalari — barchasi env o'zgaruvchilardan (lokalda default qiymatlar).
 # Production'da bularni platforma (Railway/Render) env sozlamalarida beriladi.
 tryon:
