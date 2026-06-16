@@ -40,14 +40,18 @@ public class PersonDetector {
     private volatile String inputName = "images";
     private volatile boolean loadFailed = false;
 
-    public PersonDetector() {
+    private final AppConfig config;
+
+    public PersonDetector(AppConfig config) {
+        this.config = config;
         // Model LAZY yuklanadi (birinchi detect()da) — startda xotira tejaladi.
     }
 
-    public boolean isReady() { return !loadFailed; }
+    public boolean isReady() { return config.isYoloEnabled() && !loadFailed; }
 
     /** Modelni birinchi marta kerak bo'lganda yuklaydi (kam xotira sozlamalari bilan). */
     private OrtSession session() {
+        if (!config.isYoloEnabled()) return null; // o'chirilgan
         if (session == null && !loadFailed) {
             synchronized (this) {
                 if (session == null && !loadFailed) {

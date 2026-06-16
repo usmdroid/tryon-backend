@@ -45,14 +45,18 @@ public class PoseDetector {
     private volatile OrtSession session;
     private volatile boolean loadFailed = false;
 
-    public PoseDetector() {
+    private final AppConfig config;
+
+    public PoseDetector(AppConfig config) {
+        this.config = config;
         // Model LAZY yuklanadi (birinchi detect()da) — startda va auth/dashboard'da xotira tejaladi.
     }
 
-    public boolean isReady() { return !loadFailed; }
+    public boolean isReady() { return config.isPoseEnabled() && !loadFailed; }
 
     /** Modelni birinchi marta kerak bo'lganda yuklaydi (kam xotira sozlamalari bilan). */
     private OrtSession session() {
+        if (!config.isPoseEnabled()) return null; // o'chirilgan
         if (session == null && !loadFailed) {
             synchronized (this) {
                 if (session == null && !loadFailed) {

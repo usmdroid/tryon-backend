@@ -59,6 +59,10 @@ tryon:
   # Dev: kodni send-otp javobida qaytarish (frontend toast). Production'da false!
   otp-expose-code: ${TRYON_OTP_EXPOSE_CODE:false}
 
+  # ML detektorlar (xotira tejash uchun o'chirib turish mumkin)
+  yolo-enabled: ${TRYON_YOLO_ENABLED:true}
+  pose-enabled: ${TRYON_POSE_ENABLED:true}
+
   # Rasm sifati tekshiruvi (POST /api/check) chegaralari
   check:
     min-width: ${TRYON_CHECK_MIN_WIDTH:256}

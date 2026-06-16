@@ -46,6 +46,10 @@ public class AppConfig {
     /** Dev: true bo'lsa send-otp javobida kod ham qaytadi (frontend toast uchun). Production'da false! */
     private boolean otpExposeCode = false;
 
+    /** ML detektorlarni yoqish (xotira tejash uchun). false = /check o'sha tekshiruvni skip qiladi, model yuklanmaydi. */
+    private boolean yoloEnabled = true;
+    private boolean poseEnabled = true;
+
     /** Sifat tekshiruvi chegaralari (POST /api/check uchun). */
     private final Check check = new Check();
 
@@ -128,4 +132,10 @@ public class AppConfig {
 
     public boolean isOtpExposeCode() { return otpExposeCode; }
     public void setOtpExposeCode(boolean v) { this.otpExposeCode = v; }
+
+    public boolean isYoloEnabled() { return yoloEnabled; }
+    public void setYoloEnabled(boolean v) { this.yoloEnabled = v; }
+
+    public boolean isPoseEnabled() { return poseEnabled; }
+    public void setPoseEnabled(boolean v) { this.poseEnabled = v; }
 }
