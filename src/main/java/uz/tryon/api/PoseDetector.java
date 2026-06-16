@@ -41,33 +41,39 @@ public class PoseDetector {
     private static final int TARGET = 256;
     private static final int MULT = 32; // o'lcham shunga karrali bo'lishi shart
 
-    private final OrtEnvironment env;
-    private final OrtSession session;
-    private final boolean ready;
+    private volatile OrtEnvironment env;
+    private volatile OrtSession session;
+    private volatile boolean loadFailed = false;
 
     public PoseDetector() {
-        OrtEnvironment e = null;
-        OrtSession s = null;
-        boolean ok = false;
-        try {
-            byte[] model;
-            try (InputStream in = getClass().getResourceAsStream("/models/movenet-multipose.onnx")) {
-                if (in == null) throw new IllegalStateException("Model topilmadi: /models/movenet-multipose.onnx");
-                model = in.readAllBytes();
-            }
-            e = OrtEnvironment.getEnvironment();
-            s = e.createSession(model, new OrtSession.SessionOptions());
-            ok = true;
-            log.info("MoveNet modeli yuklandi ({} bayt).", model.length);
-        } catch (Throwable t) {
-            log.error("MoveNet modelini yuklab bo'lmadi — poza tekshiruvlari o'tkazib yuboriladi.", t);
-        }
-        this.env = e;
-        this.session = s;
-        this.ready = ok;
+        // Model LAZY yuklanadi (birinchi detect()da) — startda va auth/dashboard'da xotira tejaladi.
     }
 
-    public boolean isReady() { return ready; }
+    public boolean isReady() { return !loadFailed; }
+
+    /** Modelni birinchi marta kerak bo'lganda yuklaydi (kam xotira sozlamalari bilan). */
+    private OrtSession session() {
+        if (session == null && !loadFailed) {
+            synchronized (this) {
+                if (session == null && !loadFailed) {
+                    try {
+                        byte[] model;
+                        try (InputStream in = getClass().getResourceAsStream("/models/movenet-multipose.onnx")) {
+                            if (in == null) throw new IllegalStateException("Model topilmadi: /models/movenet-multipose.onnx");
+                            model = in.readAllBytes();
+                        }
+                        env = OrtEnvironment.getEnvironment();
+                        session = env.createSession(model, OnnxOptions.lowMemory());
+                        log.info("MoveNet modeli yuklandi (lazy, {} bayt).", model.length);
+                    } catch (Throwable t) {
+                        loadFailed = true;
+                        log.error("MoveNet modelini yuklab bo'lmadi — poza tekshiruvlari o'tkazib yuboriladi.", t);
+                    }
+                }
+            }
+        }
+        return session;
+    }
 
     /** Bitta aniqlangan odam (normallashtirilgan koordinatalarda). */
     public record Keypoint(double y, double x, double score) {
@@ -83,7 +89,8 @@ public class PoseDetector {
     public record PoseResult(List<Person> persons, double fracW, double fracH) {}
 
     public PoseResult detect(BufferedImage src) {
-        if (!ready) return new PoseResult(List.of(), 1, 1);
+        OrtSession s = session();
+        if (s == null) return new PoseResult(List.of(), 1, 1);
 
         int w = src.getWidth(), h = src.getHeight();
         double scale = (double) TARGET / Math.max(w, h);
@@ -111,7 +118,7 @@ public class PoseDetector {
 
         try (OnnxTensor input = OnnxTensor.createTensor(env, IntBuffer.wrap(data),
                 new long[]{1, padH, padW, 3});
-             OrtSession.Result result = session.run(Map.of("input", input))) {
+             OrtSession.Result result = s.run(Map.of("input", input))) {
 
             float[][][] out = (float[][][]) result.get(0).getValue(); // [1][6][56]
             List<Person> persons = new ArrayList<>();

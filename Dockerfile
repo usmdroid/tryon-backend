@@ -11,5 +11,5 @@ FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
-# Konteyner RAM'ining ~70% ni heap'ga (qolgani ONNX native + metaspace uchun)
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70.0", "-jar", "/app/app.jar"]
+# Heap'ga ~55% (qolgani ONNX native off-heap + metaspace uchun), kam xotirali GC
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=55.0", "-XX:+UseSerialGC", "-XX:MaxMetaspaceSize=192m", "-jar", "/app/app.jar"]

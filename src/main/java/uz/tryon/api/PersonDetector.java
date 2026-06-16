@@ -35,44 +35,49 @@ public class PersonDetector {
     private static final float CONF = 0.40f;
     private static final float IOU = 0.45f;
 
-    private final OrtEnvironment env;
-    private final OrtSession session;
-    private final String inputName;
-    private final boolean ready;
+    private volatile OrtEnvironment env;
+    private volatile OrtSession session;
+    private volatile String inputName = "images";
+    private volatile boolean loadFailed = false;
 
     public PersonDetector() {
-        OrtEnvironment e = null;
-        OrtSession s = null;
-        String in = "images";
-        boolean ok = false;
-        try {
-            byte[] model;
-            try (InputStream is = getClass().getResourceAsStream("/models/yolov8n.onnx")) {
-                if (is == null) throw new IllegalStateException("Model topilmadi: /models/yolov8n.onnx");
-                model = is.readAllBytes();
-            }
-            e = OrtEnvironment.getEnvironment();
-            s = e.createSession(model, new OrtSession.SessionOptions());
-            in = s.getInputNames().iterator().next();
-            ok = true;
-            log.info("YOLOv8 modeli yuklandi ({} bayt), input='{}'.", model.length, in);
-        } catch (Throwable t) {
-            log.error("YOLOv8 modelini yuklab bo'lmadi — odam sanash o'tkazib yuboriladi.", t);
-        }
-        this.env = e;
-        this.session = s;
-        this.inputName = in;
-        this.ready = ok;
+        // Model LAZY yuklanadi (birinchi detect()da) — startda xotira tejaladi.
     }
 
-    public boolean isReady() { return ready; }
+    public boolean isReady() { return !loadFailed; }
+
+    /** Modelni birinchi marta kerak bo'lganda yuklaydi (kam xotira sozlamalari bilan). */
+    private OrtSession session() {
+        if (session == null && !loadFailed) {
+            synchronized (this) {
+                if (session == null && !loadFailed) {
+                    try {
+                        byte[] model;
+                        try (InputStream is = getClass().getResourceAsStream("/models/yolov8n.onnx")) {
+                            if (is == null) throw new IllegalStateException("Model topilmadi: /models/yolov8n.onnx");
+                            model = is.readAllBytes();
+                        }
+                        env = OrtEnvironment.getEnvironment();
+                        session = env.createSession(model, OnnxOptions.lowMemory());
+                        inputName = session.getInputNames().iterator().next();
+                        log.info("YOLOv8 modeli yuklandi (lazy, {} bayt), input='{}'.", model.length, inputName);
+                    } catch (Throwable t) {
+                        loadFailed = true;
+                        log.error("YOLOv8 modelini yuklab bo'lmadi — odam sanash o'tkazib yuboriladi.", t);
+                    }
+                }
+            }
+        }
+        return session;
+    }
 
     /** Topilgan odam: asl rasm koordinatalarida quti + ishonch. */
     public record Box(double x1, double y1, double x2, double y2, double score) {}
 
     /** Rasmda topilgan odamlar ro'yxati (NMS qilingan). */
     public List<Box> detect(BufferedImage src) {
-        if (!ready) return List.of();
+        OrtSession s = session();
+        if (s == null) return List.of();
         int w = src.getWidth(), h = src.getHeight();
         double r = Math.min((double) SIZE / w, (double) SIZE / h);
         int nw = (int) Math.round(w * r), nh = (int) Math.round(h * r);
@@ -97,7 +102,7 @@ public class PersonDetector {
 
         try (OnnxTensor input = OnnxTensor.createTensor(env, FloatBuffer.wrap(data),
                 new long[]{1, 3, SIZE, SIZE});
-             OrtSession.Result result = session.run(Map.of(inputName, input))) {
+             OrtSession.Result result = s.run(Map.of(inputName, input))) {
 
             float[][][] out = (float[][][]) result.get(0).getValue(); // [1][84][8400]
             float[][] o = out[0];
