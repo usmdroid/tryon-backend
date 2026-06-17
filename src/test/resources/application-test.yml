@@ -15,3 +15,6 @@ spring:
 # Test/dev: OTP kodi doim shu (LogSender'dan o'qishsiz test qilish uchun)
 tryon:
   otp-fixed-code: "123456"
+  # Testlarda ML detektorlar yoniq (CheckEndpointTest ularni sinaydi)
+  yolo-enabled: true
+  pose-enabled: true
