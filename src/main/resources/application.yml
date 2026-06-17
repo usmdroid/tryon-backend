@@ -53,9 +53,11 @@ tryon:
   token-secret: ${TRYON_TOKEN_SECRET:dev-secret-change-me}
   token-ttl-seconds: ${TRYON_TOKEN_TTL_SECONDS:300}
 
-  # OTP (telefon tasdiqlash). otp-fixed-code bo'sh = tasodifiy kod (production).
+  # OTP (telefon tasdiqlash).
+  # ⚠️ PRE-RELEASE: kod hozircha doim "123456" (env'siz kirish uchun).
+  # Real ishga tushirishdan oldin: TRYON_OTP_FIXED_CODE="" qiling + Telegram/SMS ulang.
   otp-ttl-seconds: ${TRYON_OTP_TTL_SECONDS:300}
-  otp-fixed-code: ${TRYON_OTP_FIXED_CODE:}
+  otp-fixed-code: ${TRYON_OTP_FIXED_CODE:123456}
   # Dev: kodni send-otp javobida qaytarish (frontend toast). Production'da false!
   otp-expose-code: ${TRYON_OTP_EXPOSE_CODE:false}
 
