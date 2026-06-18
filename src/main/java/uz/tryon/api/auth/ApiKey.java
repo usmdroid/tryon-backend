@@ -34,6 +34,14 @@ public class ApiKey {
     @Column(name = "key_enc")
     private String keyEnc;
 
+    /** 'secret' (sk_) yoki 'publishable' (pk_). */
+    @Column(name = "key_type", nullable = false, length = 16)
+    private String keyType = "secret";
+
+    /** pk_ uchun ruxsat etilgan domenlar (vergul bilan). sk_ uchun null. */
+    @Column(name = "allowed_domains")
+    private String allowedDomains;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -45,12 +53,15 @@ public class ApiKey {
 
     protected ApiKey() { }
 
-    public ApiKey(UUID clientId, String name, String keyPrefix, String keyHash, String keyEnc) {
+    public ApiKey(UUID clientId, String name, String keyPrefix, String keyHash, String keyEnc,
+                  String keyType, String allowedDomains) {
         this.clientId = clientId;
         this.name = name;
         this.keyPrefix = keyPrefix;
         this.keyHash = keyHash;
         this.keyEnc = keyEnc;
+        this.keyType = keyType;
+        this.allowedDomains = allowedDomains;
     }
 
     @PrePersist
@@ -68,6 +79,8 @@ public class ApiKey {
     public String getKeyPrefix() { return keyPrefix; }
     public String getKeyHash() { return keyHash; }
     public String getKeyEnc() { return keyEnc; }
+    public String getKeyType() { return keyType; }
+    public String getAllowedDomains() { return allowedDomains; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getLastUsedAt() { return lastUsedAt; }
     public Instant getRevokedAt() { return revokedAt; }

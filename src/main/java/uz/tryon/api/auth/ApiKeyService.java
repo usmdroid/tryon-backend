@@ -26,14 +26,21 @@ public class ApiKeyService {
 
     public record CreateResult(ApiKey key, String secret) { }
 
-    /** Yangi API kalit yaratadi. To'liq kalit shifrlangan holda saqlanadi (keyin ham nusxalash uchun). */
-    public CreateResult create(UUID clientId, String name) {
+    /**
+     * Yangi API kalit yaratadi. To'liq kalit shifrlangan holda saqlanadi (keyin ham nusxalash uchun).
+     * @param publishable true → pk_ (brauzer, domen allowlist bilan); false → sk_ (server).
+     * @param allowedDomains pk_ uchun ruxsat etilgan domenlar (vergul bilan); sk_ uchun e'tiborga olinmaydi.
+     */
+    public CreateResult create(UUID clientId, String name, boolean publishable, String allowedDomains) {
         byte[] randomBytes = new byte[32];
         new SecureRandom().nextBytes(randomBytes);
-        String secret = "sk_" + Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+        String prefix = publishable ? "pk_" : "sk_";
+        String secret = prefix + Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         String keyPrefix = secret.substring(0, Math.min(12, secret.length()));
         String keyHash = sha256hex(secret);
-        ApiKey key = repo.save(new ApiKey(clientId, name, keyPrefix, keyHash, cipher.encrypt(secret)));
+        String type = publishable ? "publishable" : "secret";
+        String domains = publishable ? allowedDomains : null;
+        ApiKey key = repo.save(new ApiKey(clientId, name, keyPrefix, keyHash, cipher.encrypt(secret), type, domains));
         return new CreateResult(key, secret);
     }
 
