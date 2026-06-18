@@ -31,6 +31,9 @@ public class ApiKey {
     @Column(name = "key_hash", nullable = false, unique = true)
     private String keyHash;
 
+    @Column(name = "key_enc")
+    private String keyEnc;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -42,11 +45,12 @@ public class ApiKey {
 
     protected ApiKey() { }
 
-    public ApiKey(UUID clientId, String name, String keyPrefix, String keyHash) {
+    public ApiKey(UUID clientId, String name, String keyPrefix, String keyHash, String keyEnc) {
         this.clientId = clientId;
         this.name = name;
         this.keyPrefix = keyPrefix;
         this.keyHash = keyHash;
+        this.keyEnc = keyEnc;
     }
 
     @PrePersist
@@ -63,6 +67,7 @@ public class ApiKey {
     public String getName() { return name; }
     public String getKeyPrefix() { return keyPrefix; }
     public String getKeyHash() { return keyHash; }
+    public String getKeyEnc() { return keyEnc; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getLastUsedAt() { return lastUsedAt; }
     public Instant getRevokedAt() { return revokedAt; }

@@ -34,6 +34,9 @@ public class AppConfig {
     /** Sessiya tokenini imzolash maxfiy kaliti (HMAC). Production'da albatta env orqali o'zgartiriladi. */
     private String tokenSecret = "dev-secret-change-me";
 
+    /** API kalitlarni teskari shifrlash siri (AES). Production'da TRYON_KEY_ENC_SECRET bilan o'rnating. */
+    private String keyEncSecret = "dev-secret-change-me";
+
     /** Sessiya tokeni amal qilish muddati (soniya). Default 5 daqiqa. */
     private long tokenTtlSeconds = 300;
 
@@ -120,6 +123,9 @@ public class AppConfig {
 
     public String getTokenSecret() { return tokenSecret; }
     public void setTokenSecret(String v) { this.tokenSecret = v; }
+
+    public String getKeyEncSecret() { return keyEncSecret; }
+    public void setKeyEncSecret(String v) { this.keyEncSecret = v; }
 
     public long getTokenTtlSeconds() { return tokenTtlSeconds; }
     public void setTokenTtlSeconds(long v) { this.tokenTtlSeconds = v; }

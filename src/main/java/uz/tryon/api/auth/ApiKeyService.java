@@ -15,24 +15,31 @@ import java.util.UUID;
 public class ApiKeyService {
 
     private final ApiKeyRepository repo;
+    private final SecretCipher cipher;
 
-    public ApiKeyService(ApiKeyRepository repo) {
+    public ApiKeyService(ApiKeyRepository repo, SecretCipher cipher) {
         this.repo = repo;
+        this.cipher = cipher;
     }
 
     public static class NotFoundException extends RuntimeException { }
 
     public record CreateResult(ApiKey key, String secret) { }
 
-    /** Yangi API kalit yaratadi. Sirni faqat bir marta qaytaradi — saqlanmaydi. */
+    /** Yangi API kalit yaratadi. To'liq kalit shifrlangan holda saqlanadi (keyin ham nusxalash uchun). */
     public CreateResult create(UUID clientId, String name) {
         byte[] randomBytes = new byte[32];
         new SecureRandom().nextBytes(randomBytes);
         String secret = "sk_" + Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         String keyPrefix = secret.substring(0, Math.min(12, secret.length()));
         String keyHash = sha256hex(secret);
-        ApiKey key = repo.save(new ApiKey(clientId, name, keyPrefix, keyHash));
+        ApiKey key = repo.save(new ApiKey(clientId, name, keyPrefix, keyHash, cipher.encrypt(secret)));
         return new CreateResult(key, secret);
+    }
+
+    /** To'liq kalitni ochib beradi (eski/buzilgan kalitlarda null). */
+    public String revealKey(ApiKey key) {
+        return cipher.decrypt(key.getKeyEnc());
     }
 
     public List<ApiKey> listByClient(UUID clientId) {

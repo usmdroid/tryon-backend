@@ -52,6 +52,8 @@ tryon:
   # Sessiya tokeni (HMAC imzo) — Production'da TRYON_TOKEN_SECRET ni albatta o'rnating
   token-secret: ${TRYON_TOKEN_SECRET:dev-secret-change-me}
   token-ttl-seconds: ${TRYON_TOKEN_TTL_SECONDS:300}
+  # API kalitlarni teskari shifrlash siri (AES) — Production'da albatta o'rnating
+  key-enc-secret: ${TRYON_KEY_ENC_SECRET:dev-secret-change-me}
 
   # OTP (telefon tasdiqlash).
   # ⚠️ PRE-RELEASE: kod hozircha doim "123456" (env'siz kirish uchun).
