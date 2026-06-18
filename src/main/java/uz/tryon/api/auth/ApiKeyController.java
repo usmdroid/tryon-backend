@@ -37,7 +37,7 @@ public class ApiKeyController {
         this.apiKeyService = apiKeyService;
     }
 
-    public record CreateRequest(String name, String type, String allowedDomains) { }
+    public record CreateRequest(String name) { }
 
     @GetMapping
     public ResponseEntity<?> list(HttpServletRequest request) {
@@ -51,8 +51,6 @@ public class ApiKeyController {
             m.put("name", k.getName());
             m.put("keyPrefix", k.getKeyPrefix());
             m.put("key", apiKeyService.revealKey(k));
-            m.put("type", k.getKeyType());
-            m.put("allowedDomains", k.getAllowedDomains());
             m.put("createdAt", k.getCreatedAt());
             m.put("lastUsedAt", k.getLastUsedAt());
             m.put("revokedAt", k.getRevokedAt());
@@ -68,22 +66,14 @@ public class ApiKeyController {
         if (isBlank(req.name())) return err(HttpStatus.BAD_REQUEST, "Nom to'ldirilishi shart.");
         if (req.name().trim().length() > 255) return err(HttpStatus.BAD_REQUEST, "Nom 255 belgidan oshmasligi kerak.");
 
-        boolean publishable = "publishable".equalsIgnoreCase(req.type());
-        String domains = normalizeDomains(req.allowedDomains());
-        if (publishable && domains == null) {
-            return err(HttpStatus.BAD_REQUEST, "Publishable (pk_) kalit uchun kamida bitta domen kerak.");
-        }
-
         UUID clientId = UUID.fromString(clientIdOpt.get());
-        ApiKeyService.CreateResult result = apiKeyService.create(clientId, req.name().trim(), publishable, domains);
+        ApiKeyService.CreateResult result = apiKeyService.create(clientId, req.name().trim());
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("id", result.key().getId());
         body.put("name", result.key().getName());
         body.put("key", result.secret());
         body.put("keyPrefix", result.key().getKeyPrefix());
-        body.put("type", result.key().getKeyType());
-        body.put("allowedDomains", result.key().getAllowedDomains());
         body.put("createdAt", result.key().getCreatedAt());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -122,16 +112,5 @@ public class ApiKeyController {
 
     private static boolean isBlank(String s) {
         return s == null || s.isBlank();
-    }
-
-    /** Domenlarni tozalaydi (trim, bo'shlarni tashlab, vergul bilan birlashtiradi). Bo'sh bo'lsa null. */
-    private static String normalizeDomains(String raw) {
-        if (raw == null) return null;
-        String joined = java.util.Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .reduce((a, b) -> a + "," + b)
-                .orElse("");
-        return joined.isEmpty() ? null : joined;
     }
 }
