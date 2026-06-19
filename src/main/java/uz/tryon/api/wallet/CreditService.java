@@ -66,7 +66,9 @@ public class CreditService {
     public Wallet purchase(UUID clientId, double amountUsd) {
         // TODO: real payment gateway integration is a follow-up task.
         long addMsim = Math.round(amountUsd * 100 * 1_000);
-        Wallet w = getOrCreateWallet(clientId);
+        // Pessimistic lock — same pattern as debitForTryOn to prevent lost-update on concurrent purchases.
+        Wallet w = wallets.findByClientIdForUpdate(clientId)
+                .orElseGet(() -> wallets.save(new Wallet(clientId)));
         long newBalance = w.getBalanceMsim() + addMsim;
         w.setBalanceMsim(newBalance);
         wallets.save(w);
