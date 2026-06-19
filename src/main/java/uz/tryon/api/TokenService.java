@@ -40,11 +40,15 @@ public class TokenService {
 
     public record Issued(String token, long expiresInSeconds) {}
 
-    /** Berilgan apiKey (sk) uchun yangi token zarb qiladi. */
-    public Issued mint(String apiKey) {
+    /**
+     * Berilgan subject uchun yangi token zarb qiladi.
+     * DB orqali ro'yxatdan o'tgan mijozlar uchun subject = real UUID string.
+     * Legacy config kalitlar uchun subject = clientId(apiKey) (16-char hex).
+     */
+    public Issued mint(String subject) {
         long ttl = config.getTokenTtlSeconds();
         long exp = System.currentTimeMillis() + ttl * 1000;
-        String payload = clientId(apiKey) + "|" + exp + "|" + randomNonce();
+        String payload = subject + "|" + exp + "|" + randomNonce();
         String token = b64(payload.getBytes(StandardCharsets.UTF_8)) + "." + b64(hmac(payload));
         return new Issued(token, ttl);
     }

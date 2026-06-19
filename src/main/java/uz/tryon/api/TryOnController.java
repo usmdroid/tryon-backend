@@ -4,8 +4,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import uz.tryon.api.auth.ApiKeyService;
+import uz.tryon.api.wallet.CreditService;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Asosiy endpoint: POST /api/tryon
@@ -32,16 +35,21 @@ public class TryOnController {
     private final ImageCheckService checkService;
     private final ModalClient modal;
     private final TokenService tokenService;
+    private final ApiKeyService apiKeyService;
+    private final CreditService creditService;
 
     public TryOnController(AppConfig config, RateLimiterService rateLimiter,
                            ImageValidator validator, ImageCheckService checkService,
-                           ModalClient modal, TokenService tokenService) {
+                           ModalClient modal, TokenService tokenService,
+                           ApiKeyService apiKeyService, CreditService creditService) {
         this.config = config;
         this.rateLimiter = rateLimiter;
         this.validator = validator;
         this.checkService = checkService;
         this.modal = modal;
         this.tokenService = tokenService;
+        this.apiKeyService = apiKeyService;
+        this.creditService = creditService;
     }
 
     /**
@@ -52,13 +60,25 @@ public class TryOnController {
      */
     @PostMapping("/session")
     public ResponseEntity<?> session(@RequestHeader(value = "X-Api-Key", required = false) String apiKey) {
-        if (apiKey == null || config.getApiKeys() == null || !config.getApiKeys().contains(apiKey)) {
+        if (apiKey == null) {
             return err(HttpStatus.UNAUTHORIZED, "API kalit noto'g'ri yoki yo'q.");
         }
-        TokenService.Issued issued = tokenService.mint(apiKey);
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("token", issued.token(), "expiresIn", issued.expiresInSeconds()));
+        // DB da ro'yxatdan o'tgan kalitlar — real UUID subject
+        var dbKey = apiKeyService.findActiveByRawKey(apiKey);
+        if (dbKey.isPresent()) {
+            TokenService.Issued issued = tokenService.mint(dbKey.get().getClientId().toString());
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("token", issued.token(), "expiresIn", issued.expiresInSeconds()));
+        }
+        // Legacy config kalitlar
+        if (config.getApiKeys() != null && config.getApiKeys().contains(apiKey)) {
+            TokenService.Issued issued = tokenService.mint(tokenService.clientId(apiKey));
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("token", issued.token(), "expiresIn", issued.expiresInSeconds()));
+        }
+        return err(HttpStatus.UNAUTHORIZED, "API kalit noto'g'ri yoki yo'q.");
     }
 
     /**
@@ -112,13 +132,26 @@ public class TryOnController {
         ImageValidator.Result cv = validator.validate(cloth);
         if (!cv.ok()) return err(HttpStatus.BAD_REQUEST, "Kiyim rasmi: " + cv.reason());
 
-        // 5. Modal'ga uzatish
+        // 5. Kredit tekshiruvi va yechish (faqat DB orqali ro'yxatdan o'tgan mijozlar uchun)
+        UUID clientUUID = tryParseUUID(clientId);
+        if (clientUUID != null) {
+            try {
+                creditService.debitForTryOn(clientUUID);
+            } catch (CreditService.InsufficientCreditsException e) {
+                return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(Map.of("error", "insufficient_credits",
+                                     "message", "Hisobingizda yetarli sim mavjud emas"));
+            }
+        }
+
+        // 6. Modal'ga uzatish
         ModalClient.Result result = modal.generate(person, cloth, clothType);
         if (!result.ok()) {
             return err(HttpStatus.BAD_GATEWAY, result.error());
         }
 
-        // 6. Natija rasmni qaytarish (WebP)
+        // 7. Natija rasmni qaytarish (WebP)
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("image/webp"))
                 .body(result.image());
@@ -164,5 +197,14 @@ public class TryOnController {
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("error", message));
+    }
+
+    private static UUID tryParseUUID(String s) {
+        if (s == null) return null;
+        try {
+            return UUID.fromString(s);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

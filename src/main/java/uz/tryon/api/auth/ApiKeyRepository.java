@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID> {
     List<ApiKey> findByClientIdOrderByCreatedAtDesc(UUID clientId);
     Optional<ApiKey> findByIdAndClientId(UUID id, UUID clientId);
+    Optional<ApiKey> findByKeyHash(String keyHash);
 }

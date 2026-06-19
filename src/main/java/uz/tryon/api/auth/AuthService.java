@@ -4,6 +4,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import uz.tryon.api.AppConfig;
+import uz.tryon.api.wallet.CreditService;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -26,11 +27,13 @@ public class AuthService {
 
     private final ClientRepository clients;
     private final AppConfig config;
+    private final CreditService creditService;
     private final PasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    public AuthService(ClientRepository clients, AppConfig config) {
+    public AuthService(ClientRepository clients, AppConfig config, CreditService creditService) {
         this.clients = clients;
         this.config = config;
+        this.creditService = creditService;
     }
 
     public static class EmailAlreadyExistsException extends RuntimeException { }
@@ -47,7 +50,9 @@ public class AuthService {
         if (normEmail != null && clients.existsByEmail(normEmail)) {
             throw new EmailAlreadyExistsException();
         }
-        return clients.save(new Client(name.trim(), normPhone, normEmail, encoder.encode(password)));
+        Client saved = clients.save(new Client(name.trim(), normPhone, normEmail, encoder.encode(password)));
+        creditService.grantFree(saved.getId());
+        return saved;
     }
 
     /** identifier — email yoki telefon. */

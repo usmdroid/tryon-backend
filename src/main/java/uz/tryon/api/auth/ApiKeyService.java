@@ -9,6 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -44,6 +45,12 @@ public class ApiKeyService {
 
     public List<ApiKey> listByClient(UUID clientId) {
         return repo.findByClientIdOrderByCreatedAtDesc(clientId);
+    }
+
+    /** Xom API kalit bo'yicha DB dan qidiradi (bekor qilinmaganlar). */
+    public Optional<ApiKey> findActiveByRawKey(String rawKey) {
+        return repo.findByKeyHash(sha256hex(rawKey))
+                .filter(k -> k.getRevokedAt() == null);
     }
 
     /** Kalitni bekor qiladi (idempotent). Kalit boshqa clientga tegishli bo'lsa NotFoundException. */
