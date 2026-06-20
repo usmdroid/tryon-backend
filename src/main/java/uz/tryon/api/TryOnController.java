@@ -66,7 +66,9 @@ public class TryOnController {
         // DB da ro'yxatdan o'tgan kalitlar — real UUID subject
         var dbKey = apiKeyService.findActiveByRawKey(apiKey);
         if (dbKey.isPresent()) {
-            TokenService.Issued issued = tokenService.mint(dbKey.get().getClientId().toString());
+            // Foydalanishni shu kalitga bog'lash uchun kalit id'sini token ichiga kiritamiz.
+            TokenService.Issued issued = tokenService.mint(
+                    dbKey.get().getClientId().toString(), dbKey.get().getId().toString());
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("token", issued.token(), "expiresIn", issued.expiresInSeconds()));
@@ -83,15 +85,16 @@ public class TryOnController {
 
     /**
      * So'rovni autentifikatsiya qiladi — Bearer token (afzal) yoki X-Api-Key (moslik uchun).
-     * Yaroqli bo'lsa clientId qaytaradi (rate-limit/identifikatsiya uchun), aks holda null.
+     * Yaroqli bo'lsa clientId (+ token ichidagi apiKeyId, mavjud bo'lsa) qaytaradi, aks holda null.
      * @param consumeToken Bearer token bir martalik ishlatilsinmi (qimmat amal — /tryon uchun true).
      */
-    private String authenticate(String apiKey, String authHeader, boolean consumeToken) {
+    private TokenService.Verified authenticate(String apiKey, String authHeader, boolean consumeToken) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return tokenService.verify(authHeader.substring(7).trim(), consumeToken).orElse(null);
+            return tokenService.verifyDetailed(authHeader.substring(7).trim(), consumeToken).orElse(null);
         }
         if (apiKey != null && config.getApiKeys() != null && config.getApiKeys().contains(apiKey)) {
-            return tokenService.clientId(apiKey);
+            // Legacy config kalitlar DB'da yo'q — kalit id'si yo'q (null).
+            return new TokenService.Verified(tokenService.clientId(apiKey), null);
         }
         return null;
     }
@@ -104,10 +107,11 @@ public class TryOnController {
             @RequestBody Map<String, String> payload) {
 
         // 1. Autentifikatsiya — Bearer token (bir martali) yoki X-Api-Key
-        String clientId = authenticate(apiKey, auth, true);
-        if (clientId == null) {
+        TokenService.Verified verified = authenticate(apiKey, auth, true);
+        if (verified == null) {
             return err(HttpStatus.UNAUTHORIZED, "Token yoki API kalit noto'g'ri, muddati o'tgan yoki ishlatilgan.");
         }
+        String clientId = verified.clientId();
 
         // 2. Origin (domain) allowlist — agar ro'yxat bo'sh bo'lmasa tekshiramiz
         if (config.getAllowedOrigins() != null && !config.getAllowedOrigins().isEmpty()) {
@@ -135,8 +139,10 @@ public class TryOnController {
         // 5. Kredit tekshiruvi va yechish (faqat DB orqali ro'yxatdan o'tgan mijozlar uchun)
         UUID clientUUID = tryParseUUID(clientId);
         if (clientUUID != null) {
+            // Token ichidan kelgan API kalit id'si (mavjud bo'lsa) foydalanishni shu kalitga bog'laydi.
+            UUID apiKeyUUID = tryParseUUID(verified.apiKeyId());
             try {
-                creditService.debitForTryOn(clientUUID);
+                creditService.debitForTryOn(clientUUID, apiKeyUUID);
             } catch (CreditService.InsufficientCreditsException e) {
                 return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -175,6 +181,7 @@ public class TryOnController {
 
         // Bearer token (consume QILMAYDI — arzon amal) yoki X-Api-Key
         if (authenticate(apiKey, auth, false) == null) {
+            // null = autentifikatsiya muvaffaqiyatsiz
             return err(HttpStatus.UNAUTHORIZED, "Token yoki API kalit noto'g'ri yoki muddati o'tgan.");
         }
 

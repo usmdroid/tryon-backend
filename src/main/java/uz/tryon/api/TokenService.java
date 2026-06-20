@@ -40,25 +40,45 @@ public class TokenService {
 
     public record Issued(String token, long expiresInSeconds) {}
 
+    /** Tekshiruv natijasi: clientId + (ixtiyoriy) so'rovni keltirgan API kalit id'si. */
+    public record Verified(String clientId, String apiKeyId) {}
+
     /**
-     * Berilgan subject uchun yangi token zarb qiladi.
+     * Berilgan subject uchun yangi token zarb qiladi (API kalit id'siz).
      * DB orqali ro'yxatdan o'tgan mijozlar uchun subject = real UUID string.
      * Legacy config kalitlar uchun subject = clientId(apiKey) (16-char hex).
      */
     public Issued mint(String subject) {
+        return mint(subject, null);
+    }
+
+    /**
+     * Subject (clientId) + API kalit id (nullable) uchun token zarb qiladi.
+     * apiKeyId token ichiga kiritiladi, shunda /tryon paytida foydalanish kalitga bog'lanadi.
+     * Payload formati: clientId | exp | nonce | apiKeyId (oxirgi maydon bo'sh bo'lishi mumkin).
+     */
+    public Issued mint(String subject, String apiKeyId) {
         long ttl = config.getTokenTtlSeconds();
         long exp = System.currentTimeMillis() + ttl * 1000;
-        String payload = subject + "|" + exp + "|" + randomNonce();
+        String payload = subject + "|" + exp + "|" + randomNonce() + "|" + (apiKeyId == null ? "" : apiKeyId);
         String token = b64(payload.getBytes(StandardCharsets.UTF_8)) + "." + b64(hmac(payload));
         return new Issued(token, ttl);
     }
 
     /**
-     * Tokenni tekshiradi. Yaroqli bo'lsa clientId qaytadi.
+     * Tokenni tekshiradi. Yaroqli bo'lsa clientId qaytaradi (moslik uchun saqlanган signatura).
      * @param consume true bo'lsa — bir martali: nonce ishlatiladi (qayta ishlatib bo'lmaydi).
      *                false bo'lsa — faqat imzo+muddat tekshiriladi (masalan arzon /check uchun).
      */
     public Optional<String> verify(String token, boolean consume) {
+        return verifyDetailed(token, consume).map(Verified::clientId);
+    }
+
+    /**
+     * Tokenni tekshiradi va clientId bilan birga (mavjud bo'lsa) API kalit id'sini qaytaradi.
+     * Eski 3-maydonli tokenlar ham qabul qilinadi (apiKeyId = null).
+     */
+    public Optional<Verified> verifyDetailed(String token, boolean consume) {
         if (token == null || token.isBlank()) return Optional.empty();
         int dot = token.indexOf('.');
         if (dot <= 0 || dot == token.length() - 1) return Optional.empty();
@@ -74,9 +94,9 @@ public class TokenService {
         // 1. Imzo to'g'rimi (constant-time)
         if (!constantTimeEquals(sig, b64(hmac(payload)))) return Optional.empty();
 
-        // 2. Payload format: clientId | exp | nonce
+        // 2. Payload format: clientId | exp | nonce [ | apiKeyId ]
         String[] f = payload.split("\\|", -1);
-        if (f.length != 3) return Optional.empty();
+        if (f.length != 3 && f.length != 4) return Optional.empty();
         String clientId = f[0];
         long exp;
         try {
@@ -85,6 +105,7 @@ public class TokenService {
             return Optional.empty();
         }
         String nonce = f[2];
+        String apiKeyId = (f.length == 4 && !f[3].isBlank()) ? f[3] : null;
 
         long now = System.currentTimeMillis();
         if (now > exp) return Optional.empty(); // muddati tugagan
@@ -94,7 +115,7 @@ public class TokenService {
         if (consume && usedNonces.putIfAbsent(nonce, exp) != null) {
             return Optional.empty(); // allaqachon ishlatilgan
         }
-        return Optional.of(clientId);
+        return Optional.of(new Verified(clientId, apiKeyId));
     }
 
     /** apiKey'dan ochiq (sir bo'lmagan) clientId — rate-limit/identifikatsiya uchun. */

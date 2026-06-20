@@ -3,7 +3,9 @@ package uz.tryon.api.wallet;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.tryon.api.auth.ApiKeyRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,10 +25,13 @@ public class CreditService {
 
     private final WalletRepository wallets;
     private final CreditTransactionRepository txRepo;
+    private final ApiKeyRepository apiKeys;
 
-    public CreditService(WalletRepository wallets, CreditTransactionRepository txRepo) {
+    public CreditService(WalletRepository wallets, CreditTransactionRepository txRepo,
+                         ApiKeyRepository apiKeys) {
         this.wallets = wallets;
         this.txRepo = txRepo;
+        this.apiKeys = apiKeys;
     }
 
     public static class InsufficientCreditsException extends RuntimeException { }
@@ -80,9 +85,19 @@ public class CreditService {
     /**
      * /api/tryon uchun kredit yechadi (pesimistik qulf bilan).
      * Yetarli kredit bo'lmasa — InsufficientCreditsException.
+     * Eski (kalitsiz) chaqiruvlar uchun moslik — api_key_id null yoziladi.
      */
     @Transactional
     public void debitForTryOn(UUID clientId) {
+        debitForTryOn(clientId, null);
+    }
+
+    /**
+     * /api/tryon uchun kredit yechadi va so'rovni keltirgan API kalitga bog'laydi.
+     * @param apiKeyId TRYON_DEBIT qatoriga yoziladi (nullable — kalit aniqlanmasa null).
+     */
+    @Transactional
+    public void debitForTryOn(UUID clientId, UUID apiKeyId) {
         Wallet w = wallets.findByClientIdForUpdate(clientId)
                 .orElseThrow(InsufficientCreditsException::new);
 
@@ -95,7 +110,13 @@ public class CreditService {
         w.setBalanceMsim(newBalance);
         w.setTotalRequests(w.getTotalRequests() + 1);
         wallets.save(w);
-        txRepo.save(new CreditTransaction(clientId, -rate, "TRYON_DEBIT", newBalance, null));
+        txRepo.save(new CreditTransaction(clientId, -rate, "TRYON_DEBIT", newBalance, null, apiKeyId));
+
+        // Foydalanish aniqlangan kalitga bog'lansa — last_used_at ni hozirgi vaqtga yangilaymiz
+        // (null-safe: kalitsiz/legacy chaqiruvlar uchun o'tkazib yuboriladi).
+        if (apiKeyId != null) {
+            apiKeys.touchLastUsedAt(apiKeyId, Instant.now());
+        }
     }
 
     /** Hamyon holati. */

@@ -34,17 +34,26 @@ public class CreditTransaction {
     @Column(name = "meta")
     private String meta;
 
+    /** TRYON_DEBIT qatorlari uchun — qaysi API kalit so'rovni keltirgani (nullable: legacy/session). */
+    @Column(name = "api_key_id")
+    private UUID apiKeyId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     protected CreditTransaction() { }
 
     public CreditTransaction(UUID clientId, long amountMsim, String type, long balanceAfterMsim, String meta) {
+        this(clientId, amountMsim, type, balanceAfterMsim, meta, null);
+    }
+
+    public CreditTransaction(UUID clientId, long amountMsim, String type, long balanceAfterMsim, String meta, UUID apiKeyId) {
         this.clientId = clientId;
         this.amountMsim = amountMsim;
         this.type = type;
         this.balanceAfterMsim = balanceAfterMsim;
         this.meta = meta;
+        this.apiKeyId = apiKeyId;
     }
 
     @PrePersist
@@ -58,5 +67,6 @@ public class CreditTransaction {
     public String getType() { return type; }
     public long getBalanceAfterMsim() { return balanceAfterMsim; }
     public String getMeta() { return meta; }
+    public UUID getApiKeyId() { return apiKeyId; }
     public Instant getCreatedAt() { return createdAt; }
 }
