@@ -21,6 +21,7 @@ import java.util.UUID;
  *   GET /api/monitoring/summary
  *   GET /api/monitoring/by-key
  *   GET /api/monitoring/timeseries?range=hourly|daily|weekly|monthly&apiKeyId=<ixtiyoriy>
+ *   GET /api/monitoring/history?apiKeyId=<ixtiyoriy>&limit=50&offset=0
  * Auth: Authorization: Bearer <session-token> — joriy mijozga scoped (WalletController bilan bir xil).
  */
 @RestController
@@ -98,6 +99,38 @@ public class MonitoringController {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("range", ts.range());
         body.put("buckets", buckets);
+        return ResponseEntity.ok(body);
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<?> history(
+            HttpServletRequest request,
+            @RequestParam(required = false) UUID apiKeyId,
+            @RequestParam(required = false, defaultValue = "50") int limit,
+            @RequestParam(required = false, defaultValue = "0") int offset) {
+        Optional<String> clientIdOpt = authenticate(request);
+        if (clientIdOpt.isEmpty()) return unauthorized();
+
+        UUID clientId = UUID.fromString(clientIdOpt.get());
+        MonitoringService.History h = monitoringService.history(clientId, apiKeyId, limit, offset);
+
+        List<Map<String, Object>> items = h.items().stream().map(it -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", it.id());
+            m.put("createdAt", it.createdAt());
+            m.put("apiKeyId", it.apiKeyId());
+            m.put("keyName", it.keyName());
+            m.put("keyPrefix", it.keyPrefix());
+            m.put("result", it.result());
+            m.put("spentSim", it.spentSim());
+            return m;
+        }).toList();
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("items", items);
+        body.put("total", h.total());
+        body.put("limit", h.limit());
+        body.put("offset", h.offset());
         return ResponseEntity.ok(body);
     }
 

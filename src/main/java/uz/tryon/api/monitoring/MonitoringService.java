@@ -47,6 +47,11 @@ public class MonitoringService {
 
     public record Timeseries(String range, List<Bucket> buckets) { }
 
+    public record HistoryItem(UUID id, Instant createdAt, UUID apiKeyId,
+                              String keyName, String keyPrefix, String result, double spentSim) { }
+
+    public record History(List<HistoryItem> items, long total, int limit, int offset) { }
+
     @Transactional(readOnly = true)
     public Summary summary(UUID clientId) {
         // totalRequests: TRYON_DEBIT qatorlari soni (by-key bilan mos kelishi uchun
@@ -99,6 +104,29 @@ public class MonitoringService {
                 .map(r -> new Bucket(r.getTs(), r.getCnt(), r.getSpentMsim() / 1000.0))
                 .toList();
         return new Timeseries(range, buckets);
+    }
+
+    /**
+     * Tarix: mijozning alohida foydalanish hodisalari (TRYON_DEBIT), created_at desc, sahifalangan.
+     * limit 1..100 ga, offset >= 0 ga qisiladi. natija (result) meta'dan olinadi, bo'lmasa "success".
+     */
+    @Transactional(readOnly = true)
+    public History history(UUID clientId, UUID apiKeyId, int limit, int offset) {
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        int safeOffset = Math.max(0, offset);
+        String apiKeyParam = apiKeyId == null ? null : apiKeyId.toString();
+        long total = txRepo.countHistory(clientId, apiKeyParam);
+        List<HistoryItem> items = txRepo.history(clientId, apiKeyParam, safeLimit, safeOffset).stream()
+                .map(r -> new HistoryItem(
+                        r.getId(),
+                        r.getCreatedAt(),
+                        r.getApiKeyId(),
+                        r.getKeyName(),
+                        r.getKeyPrefix(),
+                        (r.getMeta() != null && !r.getMeta().isBlank()) ? r.getMeta() : "success",
+                        r.getSpentMsim() / 1000.0))
+                .toList();
+        return new History(items, total, safeLimit, safeOffset);
     }
 
     /**

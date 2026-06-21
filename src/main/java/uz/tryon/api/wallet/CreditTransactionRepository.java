@@ -55,10 +55,53 @@ public interface CreditTransactionRepository extends JpaRepository<CreditTransac
                                             @Param("since") Instant since,
                                             @Param("apiKeyId") String apiKeyId);
 
+    /**
+     * Tarix (history): mijozning TRYON_DEBIT qatorlari, har biri alohida (agregat emas).
+     * api_keys bilan LEFT JOIN — kalit nomi/prefiksi (o'chirilgan/null bo'lsa null).
+     * apiKeyId null bo'lsa — barcha kalitlar; aks holda shu kalitga filtr.
+     * created_at bo'yicha kamayuvchi tartib, LIMIT/OFFSET bilan sahifalash.
+     */
+    @Query(value = "SELECT t.id AS id, "
+            + "t.created_at AS created_at, "
+            + "t.api_key_id AS api_key_id, "
+            + "k.name AS key_name, "
+            + "k.key_prefix AS key_prefix, "
+            + "t.meta AS meta, "
+            + "ABS(t.amount_msim) AS spent_msim "
+            + "FROM credit_transactions t "
+            + "LEFT JOIN api_keys k ON k.id = t.api_key_id "
+            + "WHERE t.client_id = :clientId AND t.type = 'TRYON_DEBIT' "
+            + "AND (CAST(:apiKeyId AS uuid) IS NULL OR t.api_key_id = CAST(:apiKeyId AS uuid)) "
+            + "ORDER BY t.created_at DESC "
+            + "LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<HistoryRow> history(@Param("clientId") UUID clientId,
+                             @Param("apiKeyId") String apiKeyId,
+                             @Param("limit") int limit,
+                             @Param("offset") int offset);
+
+    /** history bilan bir xil filtr bo'yicha jami qatorlar soni (sahifalash uchun). */
+    @Query(value = "SELECT COUNT(*) FROM credit_transactions t "
+            + "WHERE t.client_id = :clientId AND t.type = 'TRYON_DEBIT' "
+            + "AND (CAST(:apiKeyId AS uuid) IS NULL OR t.api_key_id = CAST(:apiKeyId AS uuid))",
+            nativeQuery = true)
+    long countHistory(@Param("clientId") UUID clientId,
+                      @Param("apiKeyId") String apiKeyId);
+
     /** by-key agregat qatori proyeksiyasi. */
     interface KeyUsageRow {
         UUID getApiKeyId();
         long getRequests();
+        long getSpentMsim();
+    }
+
+    /** Tarix qatori proyeksiyasi. */
+    interface HistoryRow {
+        UUID getId();
+        Instant getCreatedAt();
+        UUID getApiKeyId();
+        String getKeyName();
+        String getKeyPrefix();
+        String getMeta();
         long getSpentMsim();
     }
 
