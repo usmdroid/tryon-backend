@@ -57,6 +57,7 @@ class WalletE2ETest {
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "TestUser", "phone", phone,
+                                "email", phone.replaceAll("\\D", "") + "@test.uz",
                                 "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -111,7 +112,7 @@ class WalletE2ETest {
                 .andReturn().getResponse().getContentAsString();
 
         String regBody = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "T", "phone", phone, "password", "parol123", "code", OTP)))
+                        .content(json("name", "T", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -176,7 +177,7 @@ class WalletE2ETest {
                 .andReturn().getResponse().getContentAsString();
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "T", "phone", phone, "password", "parol123", "code", OTP)))
+                        .content(json("name", "T", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         JsonNode reg = mapper.readTree(body);
@@ -222,7 +223,7 @@ class WalletE2ETest {
                 .content(json("phone", phone))).andExpect(status().isOk());
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "Broke", "phone", phone, "password", "parol123", "code", OTP)))
+                        .content(json("name", "Broke", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         JsonNode reg = mapper.readTree(body);
@@ -280,7 +281,7 @@ class WalletE2ETest {
                 .content(json("phone", phone))).andExpect(status().isOk());
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "Broke", "phone", phone, "password", "parol123", "code", OTP)))
+                        .content(json("name", "Broke", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         JsonNode reg = mapper.readTree(body);
@@ -317,7 +318,7 @@ class WalletE2ETest {
                 .content(json("phone", phone))).andExpect(status().isOk());
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "T", "phone", phone, "password", "parol123", "code", OTP)))
+                        .content(json("name", "T", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String token = mapper.readTree(body).get("token").asText();

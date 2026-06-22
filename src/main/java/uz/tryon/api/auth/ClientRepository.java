@@ -7,6 +7,10 @@ import java.util.UUID;
 
 public interface ClientRepository extends JpaRepository<Client, UUID> {
     Optional<Client> findByEmailOrPhone(String email, String phone);
+    Optional<Client> findByPhone(String phone);
     boolean existsByEmail(String email);
     boolean existsByPhone(String phone);
+
+    /** Barcha mijozlar, yangilardan eskiga (admin ro'yxati uchun). */
+    java.util.List<Client> findAllByOrderByCreatedAtDesc();
 }

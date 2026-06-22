@@ -26,6 +26,16 @@ public interface CreditTransactionRepository extends JpaRepository<CreditTransac
             + "WHERE t.clientId = :clientId AND t.type = 'TRYON_DEBIT'")
     long sumDebitMsim(@Param("clientId") UUID clientId);
 
+    // ---- Admin (super-admin) agregatlari — barcha mijozlar bo'yicha ----
+
+    /** Barcha mijozlar bo'yicha TRYON_DEBIT qatorlari soni (admin statistikasi). */
+    @Query("SELECT COUNT(t) FROM CreditTransaction t WHERE t.type = 'TRYON_DEBIT'")
+    long countAllDebits();
+
+    /** Barcha mijozlar bo'yicha PURCHASE summasi (msim) — tushum hisoboti uchun. */
+    @Query("SELECT COALESCE(SUM(t.amountMsim), 0) FROM CreditTransaction t WHERE t.type = 'PURCHASE'")
+    long sumAllPurchaseMsim();
+
     /**
      * Kalit bo'yicha TRYON_DEBIT agregati (faqat foydalanish bor kalitlar/null guruh).
      * Kalitlar ro'yxati bilan birikma servisda amalga oshiriladi (0-li kalitlar ham ko'rinishi uchun).

@@ -47,6 +47,7 @@ class ApiKeyTest {
                 .content(json("phone", phone))).andExpect(status().isOk());
         MvcResult r = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "User " + phone, "phone", phone,
+                                "email", phone.replaceAll("\\D", "") + "@test.uz",
                                 "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk()).andReturn();
         Map<?, ?> body = mapper.readValue(r.getResponse().getContentAsString(), Map.class);

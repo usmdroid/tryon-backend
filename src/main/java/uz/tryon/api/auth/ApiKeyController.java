@@ -53,6 +53,8 @@ public class ApiKeyController {
             m.put("createdAt", k.getCreatedAt());
             m.put("lastUsedAt", k.getLastUsedAt());
             m.put("revokedAt", k.getRevokedAt());
+            // Connect oqimi uchun: keyEnc mavjud va bekor qilinmagan kalitlar tanlanishi mumkin
+            m.put("revealable", k.getRevokedAt() == null && k.getKeyEnc() != null);
             return m;
         }).toList();
         return ResponseEntity.ok(result);

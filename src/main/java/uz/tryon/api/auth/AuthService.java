@@ -40,12 +40,13 @@ public class AuthService {
     public static class PhoneAlreadyExistsException extends RuntimeException { }
     public static class InvalidCredentialsException extends RuntimeException { }
 
-    /** Telefon majburiy va unik; email ixtiyoriy (berilsa unik). */
+    /** Telefon va email — ikkalasi ham majburiy va unik. (Bo'sh email controllerda rad etiladi.) */
     public Client register(String name, String phone, String email, String password) {
         String normPhone = Phones.normalize(phone);
         if (clients.existsByPhone(normPhone)) {
             throw new PhoneAlreadyExistsException();
         }
+        // Email har doim mavjud bo'ladi; mudofaa uchun bo'shni hamon null deb qoldiramiz.
         String normEmail = (email == null || email.isBlank()) ? null : email.trim().toLowerCase();
         if (normEmail != null && clients.existsByEmail(normEmail)) {
             throw new EmailAlreadyExistsException();

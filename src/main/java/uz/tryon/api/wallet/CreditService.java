@@ -83,6 +83,25 @@ public class CreditService {
     }
 
     /**
+     * Super-admin tomonidan qo'lda kredit qo'shish (sim).
+     * ADMIN_CREDIT qatori yoziladi. purchase() bilan bir xil pesimistik qulf naqshi.
+     * @param sim qo'shiladigan sim miqdori (musbat).
+     * @return yangilangan hamyon.
+     */
+    @Transactional
+    public Wallet adminCreditSim(UUID clientId, double sim) {
+        long addMsim = Math.round(sim * 1_000);
+        Wallet w = wallets.findByClientIdForUpdate(clientId)
+                .orElseGet(() -> wallets.save(new Wallet(clientId)));
+        long newBalance = w.getBalanceMsim() + addMsim;
+        w.setBalanceMsim(newBalance);
+        wallets.save(w);
+        txRepo.save(new CreditTransaction(clientId, addMsim, "ADMIN_CREDIT", newBalance,
+                String.format("Admin krediti: %.3f sim", sim)));
+        return wallets.findById(clientId).orElseThrow();
+    }
+
+    /**
      * /api/tryon uchun kredit yechadi (pesimistik qulf bilan).
      * Yetarli kredit bo'lmasa — InsufficientCreditsException.
      * Eski (kalitsiz) chaqiruvlar uchun moslik — api_key_id null yoziladi.

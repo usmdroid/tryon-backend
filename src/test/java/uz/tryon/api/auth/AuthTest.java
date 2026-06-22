@@ -44,7 +44,7 @@ class AuthTest {
     void register_otp_bilan_200() throws Exception {
         sendOtp("+998901110002");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "ATLAS", "phone", "+998901110002", "password", "parol123", "code", OTP)))
+                        .content(json("name", "ATLAS", "phone", "+998901110002", "email", "atlas2@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andExpect(jsonPath("$.client.phone").value("+998901110002"));
@@ -54,14 +54,14 @@ class AuthTest {
     void register_notogri_kod_400() throws Exception {
         sendOtp("+998901110003");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "A", "phone", "+998901110003", "password", "parol123", "code", "000000")))
+                        .content(json("name", "A", "phone", "+998901110003", "email", "a3@dokon.uz", "password", "parol123", "code", "000000")))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void register_kodsiz_400() throws Exception {
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "A", "phone", "+998901110004", "password", "parol123")))
+                        .content(json("name", "A", "phone", "+998901110004", "email", "a4@dokon.uz", "password", "parol123")))
                 .andExpect(status().isBadRequest());
     }
 
@@ -69,7 +69,7 @@ class AuthTest {
     void register_qisqa_parol_400() throws Exception {
         sendOtp("+998901110005");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "A", "phone", "+998901110005", "password", "123", "code", OTP)))
+                        .content(json("name", "A", "phone", "+998901110005", "email", "a5@dokon.uz", "password", "123", "code", OTP)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -77,19 +77,48 @@ class AuthTest {
     void register_takror_telefon_409() throws Exception {
         sendOtp("+998901110006");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                .content(json("name", "A", "phone", "+998901110006", "password", "parol123", "code", OTP)))
+                .content(json("name", "A", "phone", "+998901110006", "email", "a6@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk());
         sendOtp("+998901110006");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("name", "A", "phone", "+998901110006", "password", "parol123", "code", OTP)))
+                        .content(json("name", "A", "phone", "+998901110006", "email", "a6-boshqa@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void register_takror_email_409() throws Exception {
+        sendOtp("+998901110009");
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                .content(json("name", "A", "phone", "+998901110009", "email", "takror@dokon.uz", "password", "parol123", "code", OTP)))
+                .andExpect(status().isOk());
+        // Boshqa telefon, lekin o'sha email — 409 bo'lishi kerak.
+        sendOtp("+998901110010");
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("name", "A", "phone", "+998901110010", "email", "takror@dokon.uz", "password", "parol123", "code", OTP)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void register_emailsiz_400() throws Exception {
+        sendOtp("+998901110011");
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("name", "A", "phone", "+998901110011", "password", "parol123", "code", OTP)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_notogri_email_400() throws Exception {
+        sendOtp("+998901110012");
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("name", "A", "phone", "+998901110012", "email", "notogri-email", "password", "parol123", "code", OTP)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void login_telefon_bilan_200() throws Exception {
         sendOtp("+998901110007");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                .content(json("name", "A", "phone", "+998901110007", "password", "parol123", "code", OTP)))
+                .content(json("name", "A", "phone", "+998901110007", "email", "a7@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk());
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(json("identifier", "+998901110007", "password", "parol123")))
@@ -98,10 +127,22 @@ class AuthTest {
     }
 
     @Test
+    void login_email_bilan_200() throws Exception {
+        sendOtp("+998901110013");
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                .content(json("name", "A", "phone", "+998901110013", "email", "a13@dokon.uz", "password", "parol123", "code", OTP)))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("identifier", "a13@dokon.uz", "password", "parol123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty());
+    }
+
+    @Test
     void login_notogri_parol_401() throws Exception {
         sendOtp("+998901110008");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                .content(json("name", "A", "phone", "+998901110008", "password", "parol123", "code", OTP)))
+                .content(json("name", "A", "phone", "+998901110008", "email", "a8@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk());
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(json("identifier", "+998901110008", "password", "boshqa999")))

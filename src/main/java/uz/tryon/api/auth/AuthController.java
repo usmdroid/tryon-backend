@@ -34,6 +34,10 @@ public class AuthController {
     public record RegisterRequest(String name, String phone, String email, String password, String code) { }
     public record LoginRequest(String identifier, String password) { }
 
+    // Email formati uchun oddiy, ishonchli tekshiruv: lokal@domen.tld
+    private static final java.util.regex.Pattern EMAIL_RX =
+            java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
     /** Telefonga tasdiqlash kodi yuboradi (registratsiyadan oldin). */
     @PostMapping("/send-otp")
     public ResponseEntity<?> sendOtp(@RequestBody SendOtpRequest req) {
@@ -55,6 +59,14 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
         if (isBlank(req.name()) || isBlank(req.phone()) || isBlank(req.password())) {
             return err(HttpStatus.BAD_REQUEST, "Do'kon nomi, telefon va parol to'ldirilishi shart.");
+        }
+        // Email endi majburiy — bo'sh bo'lsa rad etamiz.
+        if (isBlank(req.email())) {
+            return err(HttpStatus.BAD_REQUEST, "Email to'ldirilishi shart.");
+        }
+        // Email formatini tekshiramiz (lokal@domen.tld).
+        if (!EMAIL_RX.matcher(req.email().trim()).matches()) {
+            return err(HttpStatus.BAD_REQUEST, "Email formati noto'g'ri.");
         }
         if (req.password().length() < 6) {
             return err(HttpStatus.BAD_REQUEST, "Parol kamida 6 belgidan iborat bo'lsin.");
@@ -91,6 +103,7 @@ public class AuthController {
         client.put("name", c.getName());
         client.put("phone", c.getPhone());
         client.put("email", c.getEmail()); // null bo'lishi mumkin — HashMap ruxsat beradi
+        client.put("role", c.getRole());
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("token", auth.issueSessionToken(c), "client", client));

@@ -149,6 +149,58 @@ Eslatma: detektorlar haqiqiy fotosuratlar uchun. Ikona/multik kabi tekis rasmlar
 4. Env o'zgaruvchilarni platforma sozlamalarida bering (yuqoridagi jadval).
 5. Deploy.
 
+## Connect oqimi (CMS plaginlari uchun)
+
+WordPress yoki Shopify plaginlari Sima'ga kalit **qo'lda nusxalamasdan** avtomatik olishi mumkin.
+Mavjud manual kalit yaratish/nusxalash oqimi to'liq saqlanadi.
+
+### Oqim
+
+```
+1. Plugin foydalanuvchini Sima'ga yo'naltiradi:
+   GET https://sima.uz/connect?redirect_uri=https://shop.uz/sima/callback&state=RANDOM
+
+2. Sima sahifasida foydalanuvchi login qiladi (bo'lmasa) va kalit tanlaydi.
+   Domen: "shop.uz saytiga ulanmoqchimisiz?" — tasdiqlaydi.
+
+3. Frontend backendga:
+   POST /api/connect/authorize
+   Authorization: Bearer <session-token>
+   { "apiKeyId": "...", "redirectUri": "https://shop.uz/sima/callback", "state": "RANDOM" }
+   → { "code": "one-time-code" }
+
+4. Frontend brauzerni yo'naltiradi:
+   https://shop.uz/sima/callback?code=one-time-code&state=RANDOM
+
+5. Plugin SERVERI (browser emas!) koddan kalit oladi:
+   POST https://sima-backend.railway.app/api/connect/exchange
+   Content-Type: application/json
+   { "code": "one-time-code" }
+   → { "key": "sk_..." }
+```
+
+### Xavfsizlik
+
+- `code` bir martalik, TTL ~5 daqiqa, SHA-256 hash ko'rinishida saqlanadi.
+- Kalit **brauzerga hech qachon** chiqmaydi — faqat server-server exchange orqali beriladi.
+- `redirect_uri` faqat `https` yoki `localhost http` qabul qilinadi.
+- Eski kalitlar (`keyEnc=null`) va bekor qilingan kalitlar tanlab bo'lmaydi.
+
+### Plugin serveridan misol (curl)
+
+```bash
+# 4-qadamdan callback'da ?code=... parametri keladi
+CODE="one-time-code-from-callback"
+
+curl -s -X POST https://sima-backend.railway.app/api/connect/exchange \
+  -H "Content-Type: application/json" \
+  -d "{\"code\": \"$CODE\"}"
+# Javob: {"key":"sk_..."}
+```
+
+Kalit olingandan so'ng plugin uni xavfsiz joyda (masalan, `.env` faylida) saqlaydi
+va `POST /api/tryon` da `X-Api-Key: sk_...` sifatida ishlatadi.
+
 ## Keyingi bosqichlar (backend dev uchun)
 
 - ✅ Imzolangan token (HMAC + nonce) qo'shildi.
@@ -156,4 +208,5 @@ Eslatma: detektorlar haqiqiy fotosuratlar uchun. Ikona/multik kabi tekis rasmlar
 - ✅ PostgreSQL: API kalitlar va billing qo'shildi.
 - ✅ Rasm natijasini R2/S3'ga saqlash — `StorageService` qo'shildi.
 - ✅ Rate limit Redis bilan (ko'p server uchun) — `RateLimiterService` yangilandi.
+- ✅ Connect oqimi (OAuth-uslubida CMS plugin kalit ulash) qo'shildi.
 - Modal tarafida secret tekshiruvini yoqish.

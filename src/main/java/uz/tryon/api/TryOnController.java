@@ -5,6 +5,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import uz.tryon.api.auth.ApiKeyService;
+import uz.tryon.api.auth.Client;
+import uz.tryon.api.auth.ClientRepository;
 import uz.tryon.api.wallet.CreditService;
 
 import java.util.Map;
@@ -38,12 +40,13 @@ public class TryOnController {
     private final ApiKeyService apiKeyService;
     private final CreditService creditService;
     private final StorageService storageService;
+    private final ClientRepository clientRepository;
 
     public TryOnController(AppConfig config, RateLimiterService rateLimiter,
                            ImageValidator validator, ImageCheckService checkService,
                            ModalClient modal, TokenService tokenService,
                            ApiKeyService apiKeyService, CreditService creditService,
-                           StorageService storageService) {
+                           StorageService storageService, ClientRepository clientRepository) {
         this.config = config;
         this.rateLimiter = rateLimiter;
         this.validator = validator;
@@ -53,6 +56,7 @@ public class TryOnController {
         this.apiKeyService = apiKeyService;
         this.creditService = creditService;
         this.storageService = storageService;
+        this.clientRepository = clientRepository;
     }
 
     /**
@@ -69,6 +73,10 @@ public class TryOnController {
         // DB da ro'yxatdan o'tgan kalitlar — real UUID subject
         var dbKey = apiKeyService.findActiveByRawKey(apiKey);
         if (dbKey.isPresent()) {
+            // To'xtatilgan (SUSPENDED) mijoz token ololmaydi.
+            if (isSuspended(dbKey.get().getClientId().toString())) {
+                return err(HttpStatus.FORBIDDEN, "Hisobingiz to'xtatilgan. Iltimos, qo'llab-quvvatlash xizmatiga murojaat qiling.");
+            }
             // Foydalanishni shu kalitga bog'lash uchun kalit id'sini token ichiga kiritamiz.
             TokenService.Issued issued = tokenService.mint(
                     dbKey.get().getClientId().toString(), dbKey.get().getId().toString());
@@ -115,6 +123,11 @@ public class TryOnController {
             return err(HttpStatus.UNAUTHORIZED, "Token yoki API kalit noto'g'ri, muddati o'tgan yoki ishlatilgan.");
         }
         String clientId = verified.clientId();
+
+        // To'xtatilgan (SUSPENDED) mijoz so'rov yubora olmaydi.
+        if (isSuspended(clientId)) {
+            return err(HttpStatus.FORBIDDEN, "Hisobingiz to'xtatilgan. Iltimos, qo'llab-quvvatlash xizmatiga murojaat qiling.");
+        }
 
         // 2. Origin (domain) allowlist — agar ro'yxat bo'sh bo'lmasa tekshiramiz
         if (config.getAllowedOrigins() != null && !config.getAllowedOrigins().isEmpty()) {
@@ -188,9 +201,14 @@ public class TryOnController {
             @RequestBody Map<String, String> payload) {
 
         // Bearer token (consume QILMAYDI — arzon amal) yoki X-Api-Key
-        if (authenticate(apiKey, auth, false) == null) {
+        TokenService.Verified verified = authenticate(apiKey, auth, false);
+        if (verified == null) {
             // null = autentifikatsiya muvaffaqiyatsiz
             return err(HttpStatus.UNAUTHORIZED, "Token yoki API kalit noto'g'ri yoki muddati o'tgan.");
+        }
+        // To'xtatilgan (SUSPENDED) mijoz tekshiruv qila olmaydi.
+        if (isSuspended(verified.clientId())) {
+            return err(HttpStatus.FORBIDDEN, "Hisobingiz to'xtatilgan. Iltimos, qo'llab-quvvatlash xizmatiga murojaat qiling.");
         }
 
         String person = payload.get("person_image");
@@ -221,5 +239,18 @@ public class TryOnController {
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * clientId UUID bo'lsa va shu mijoz SUSPENDED bo'lsa — true.
+     * Legacy (UUID bo'lmagan, config kalitiga asoslangan) clientId — tekshirilmaydi (false).
+     */
+    private boolean isSuspended(String clientId) {
+        UUID uuid = tryParseUUID(clientId);
+        if (uuid == null) return false;
+        return clientRepository.findById(uuid)
+                .map(Client::getStatus)
+                .filter("SUSPENDED"::equals)
+                .isPresent();
     }
 }

@@ -34,6 +34,14 @@ public class Client {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    /** Rol: CLIENT (oddiy hamkor) yoki SUPER_ADMIN (super-admin). Default — CLIENT. */
+    @Column(name = "role", nullable = false, length = 20)
+    private String role = "CLIENT";
+
+    /** Holat: ACTIVE (faol) yoki SUSPENDED (to'xtatilgan). Default — ACTIVE. */
+    @Column(name = "status", nullable = false, length = 20)
+    private String status = "ACTIVE";
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -44,11 +52,15 @@ public class Client {
         this.phone = phone;
         this.email = email;
         this.passwordHash = passwordHash;
+        this.role = "CLIENT";
+        this.status = "ACTIVE";
     }
 
     @PrePersist
     void prePersist() {
         if (createdAt == null) createdAt = Instant.now();
+        if (role == null) role = "CLIENT";
+        if (status == null) status = "ACTIVE";
     }
 
     public UUID getId() { return id; }
@@ -56,5 +68,13 @@ public class Client {
     public String getPhone() { return phone; }
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
+    public String getRole() { return role; }
+    public String getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
+
+    /** Rolni o'zgartirish (faqat @Transactional servis metodlari ichida ishlatiladi). */
+    public void setRole(String role) { this.role = role; }
+
+    /** Holatni o'zgartirish (faqat @Transactional servis metodlari ichida ishlatiladi). */
+    public void setStatus(String status) { this.status = status; }
 }
