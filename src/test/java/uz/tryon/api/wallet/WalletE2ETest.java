@@ -53,7 +53,7 @@ class WalletE2ETest {
     /** Register a fresh client and return their dashboard session token. */
     private String registerAndLogin(String phone) throws Exception {
         mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                .content(json("phone", phone))).andExpect(status().isOk());
+                .content(json("email", phone.replaceAll("\\D", "") + "@test.uz"))).andExpect(status().isOk());
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "TestUser", "phone", phone,
@@ -107,7 +107,7 @@ class WalletE2ETest {
     void registration_writesFreGrantLedgerRow() throws Exception {
         String phone = uniquePhone();
         String body = mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("phone", phone)))
+                        .content(json("email", phone.replaceAll("\\D", "") + "@test.uz")))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -172,7 +172,7 @@ class WalletE2ETest {
     void purchase_writesLedgerRow() throws Exception {
         String phone = uniquePhone();
         String regBody = mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                        .content(json("phone", phone)))
+                        .content(json("email", phone.replaceAll("\\D", "") + "@test.uz")))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -220,7 +220,7 @@ class WalletE2ETest {
     void tryon_insufficientCredits_402() throws Exception {
         String phone = uniquePhone();
         mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                .content(json("phone", phone))).andExpect(status().isOk());
+                .content(json("email", phone.replaceAll("\\D", "") + "@test.uz"))).andExpect(status().isOk());
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "Broke", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))
@@ -278,7 +278,7 @@ class WalletE2ETest {
     void tryon_apiEndpoint_insufficientCredits_returns402() throws Exception {
         String phone = uniquePhone();
         mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                .content(json("phone", phone))).andExpect(status().isOk());
+                .content(json("email", phone.replaceAll("\\D", "") + "@test.uz"))).andExpect(status().isOk());
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "Broke", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))
@@ -315,7 +315,7 @@ class WalletE2ETest {
     void transactions_freshClient_hasFreeGrantEntry() throws Exception {
         String phone = uniquePhone();
         mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                .content(json("phone", phone))).andExpect(status().isOk());
+                .content(json("email", phone.replaceAll("\\D", "") + "@test.uz"))).andExpect(status().isOk());
 
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "T", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))

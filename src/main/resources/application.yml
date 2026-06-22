@@ -64,13 +64,21 @@ tryon:
   # API kalitlarni teskari shifrlash siri (AES) — Production'da albatta o'rnating
   key-enc-secret: ${TRYON_KEY_ENC_SECRET:dev-secret-change-me}
 
-  # OTP (telefon tasdiqlash).
+  # OTP (email tasdiqlash).
   # ⚠️ PRE-RELEASE: kod hozircha doim "123456" (env'siz kirish uchun).
-  # Real ishga tushirishdan oldin: TRYON_OTP_FIXED_CODE="" qiling + Telegram/SMS ulang.
+  # Real ishga tushirishdan oldin: TRYON_OTP_FIXED_CODE="" qiling + email provayder (Resend) ulang.
   otp-ttl-seconds: ${TRYON_OTP_TTL_SECONDS:300}
   otp-fixed-code: ${TRYON_OTP_FIXED_CODE:123456}
   # Dev: kodni send-otp javobida qaytarish (frontend toast). Production'da false!
   otp-expose-code: ${TRYON_OTP_EXPOSE_CODE:false}
+
+  # Email (OTP yetkazish). Hamma uchta qiymat bo'sh = LOG REJIMI:
+  # real email yuborilmaydi, kod faqat server log'iga yoziladi (dev/test).
+  # Domen tayyor bo'lganda yoqish: MAIL_PROVIDER=resend, MAIL_FROM=noreply@<domen>,
+  # RESEND_API_KEY=<kalit> — kodga tegmasdan real email yuborish boshlanadi.
+  mail-provider: ${MAIL_PROVIDER:}
+  mail-from: ${MAIL_FROM:}
+  resend-api-key: ${RESEND_API_KEY:}
 
   # Redis (rate limit uchun). Bo'sh = xotirada ishlaydi (lokal/test uchun).
   redis-url: ${REDIS_URL:}

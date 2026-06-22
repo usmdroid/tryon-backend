@@ -14,7 +14,7 @@ import java.util.HashMap;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** /api/auth: send-otp + register (OTP bilan) + login testlari. Test profilida OTP = "123456". */
+/** /api/auth: send-otp (email) + register (OTP bilan) + login testlari. Test profilida OTP = "123456". */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -30,19 +30,19 @@ class AuthTest {
         return mapper.writeValueAsString(m);
     }
 
-    private void sendOtp(String phone) throws Exception {
+    private void sendOtp(String email) throws Exception {
         mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                .content(json("phone", phone))).andExpect(status().isOk());
+                .content(json("email", email))).andExpect(status().isOk());
     }
 
     @Test
     void otp_yuborish_200() throws Exception {
-        sendOtp("+998901110001");
+        sendOtp("a1@dokon.uz");
     }
 
     @Test
     void register_otp_bilan_200() throws Exception {
-        sendOtp("+998901110002");
+        sendOtp("atlas2@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "ATLAS", "phone", "+998901110002", "email", "atlas2@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
@@ -52,7 +52,7 @@ class AuthTest {
 
     @Test
     void register_notogri_kod_400() throws Exception {
-        sendOtp("+998901110003");
+        sendOtp("a3@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "A", "phone", "+998901110003", "email", "a3@dokon.uz", "password", "parol123", "code", "000000")))
                 .andExpect(status().isBadRequest());
@@ -67,7 +67,7 @@ class AuthTest {
 
     @Test
     void register_qisqa_parol_400() throws Exception {
-        sendOtp("+998901110005");
+        sendOtp("a5@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "A", "phone", "+998901110005", "email", "a5@dokon.uz", "password", "123", "code", OTP)))
                 .andExpect(status().isBadRequest());
@@ -75,11 +75,11 @@ class AuthTest {
 
     @Test
     void register_takror_telefon_409() throws Exception {
-        sendOtp("+998901110006");
+        sendOtp("a6@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                 .content(json("name", "A", "phone", "+998901110006", "email", "a6@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk());
-        sendOtp("+998901110006");
+        sendOtp("a6-boshqa@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "A", "phone", "+998901110006", "email", "a6-boshqa@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isConflict());
@@ -87,12 +87,12 @@ class AuthTest {
 
     @Test
     void register_takror_email_409() throws Exception {
-        sendOtp("+998901110009");
+        sendOtp("takror@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                 .content(json("name", "A", "phone", "+998901110009", "email", "takror@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk());
         // Boshqa telefon, lekin o'sha email — 409 bo'lishi kerak.
-        sendOtp("+998901110010");
+        sendOtp("takror@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "A", "phone", "+998901110010", "email", "takror@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isConflict());
@@ -100,7 +100,6 @@ class AuthTest {
 
     @Test
     void register_emailsiz_400() throws Exception {
-        sendOtp("+998901110011");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "A", "phone", "+998901110011", "password", "parol123", "code", OTP)))
                 .andExpect(status().isBadRequest());
@@ -108,7 +107,6 @@ class AuthTest {
 
     @Test
     void register_notogri_email_400() throws Exception {
-        sendOtp("+998901110012");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "A", "phone", "+998901110012", "email", "notogri-email", "password", "parol123", "code", OTP)))
                 .andExpect(status().isBadRequest());
@@ -116,7 +114,7 @@ class AuthTest {
 
     @Test
     void login_telefon_bilan_200() throws Exception {
-        sendOtp("+998901110007");
+        sendOtp("a7@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                 .content(json("name", "A", "phone", "+998901110007", "email", "a7@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk());
@@ -128,7 +126,7 @@ class AuthTest {
 
     @Test
     void login_email_bilan_200() throws Exception {
-        sendOtp("+998901110013");
+        sendOtp("a13@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                 .content(json("name", "A", "phone", "+998901110013", "email", "a13@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk());
@@ -140,7 +138,7 @@ class AuthTest {
 
     @Test
     void login_notogri_parol_401() throws Exception {
-        sendOtp("+998901110008");
+        sendOtp("a8@dokon.uz");
         mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                 .content(json("name", "A", "phone", "+998901110008", "email", "a8@dokon.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk());

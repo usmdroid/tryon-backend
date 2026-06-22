@@ -55,7 +55,7 @@ class ConnectTest {
     void setup() throws Exception {
         String phone = "+998902230100";
         mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                .content(json("phone", phone))).andExpect(status().isOk());
+                .content(json("email", "connect-test@dokon.uz"))).andExpect(status().isOk());
 
         MvcResult r = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "Connect Test", "phone", phone,

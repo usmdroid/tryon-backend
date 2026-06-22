@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uz.tryon.api.auth.Client;
 import uz.tryon.api.auth.ClientRepository;
+import uz.tryon.api.auth.OtpService;
 import uz.tryon.api.wallet.CreditService;
 import uz.tryon.api.wallet.CreditTransaction;
 import uz.tryon.api.wallet.CreditTransactionRepository;
@@ -43,19 +44,23 @@ public class AdminController {
     private final WalletRepository wallets;
     private final CreditTransactionRepository txRepo;
     private final CreditService creditService;
+    private final OtpService otpService;
 
     public AdminController(AdminAccessService access, AdminService adminService,
                            ClientRepository clients, WalletRepository wallets,
-                           CreditTransactionRepository txRepo, CreditService creditService) {
+                           CreditTransactionRepository txRepo, CreditService creditService,
+                           OtpService otpService) {
         this.access = access;
         this.adminService = adminService;
         this.clients = clients;
         this.wallets = wallets;
         this.txRepo = txRepo;
         this.creditService = creditService;
+        this.otpService = otpService;
     }
 
     public record CreditRequest(double amountSim) { }
+    public record UnblockOtpRequest(String email) { }
 
     /** Barcha mijozlar ro'yxati (balans, so'rovlar, holat, rol). */
     @GetMapping("/clients")
@@ -159,6 +164,17 @@ public class AdminController {
         body.put("totalRequests", txRepo.countAllDebits());
         body.put("totalRevenueSim", txRepo.sumAllPurchaseMsim() / 1000.0);
         return ResponseEntity.ok(body);
+    }
+
+    /** OTP suiiste'mol blokini bekor qilish — blok + breach + eskalatsiya darajasini tozalaydi. */
+    @PostMapping("/otp/unblock")
+    public ResponseEntity<?> unblockOtp(@RequestBody UnblockOtpRequest req, HttpServletRequest request) {
+        access.requireSuperAdmin(request);
+        if (req == null || req.email() == null || req.email().isBlank()) {
+            return err(HttpStatus.BAD_REQUEST, "Email kiritilishi shart.");
+        }
+        otpService.unblock(req.email());
+        return ResponseEntity.ok(Map.of("message", "OTP bloki bekor qilindi."));
     }
 
     private ResponseEntity<Map<String, String>> notFound() {

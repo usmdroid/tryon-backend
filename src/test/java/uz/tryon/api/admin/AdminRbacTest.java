@@ -51,7 +51,7 @@ class AdminRbacTest {
 
     private RegResult registerAndLogin(String phone) throws Exception {
         mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                .content(json("phone", phone))).andExpect(status().isOk());
+                .content(json("email", phone.replaceAll("\\D", "") + "@test.uz"))).andExpect(status().isOk());
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "T", "phone", phone, "email", phone.replaceAll("\\D", "") + "@test.uz", "password", "parol123", "code", OTP)))
                 .andExpect(status().isOk())
@@ -149,5 +149,36 @@ class AdminRbacTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("amountSim", 10)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void normalClient_unblockOtp_403() throws Exception {
+        RegResult r = registerAndLogin(uniquePhone());
+        mvc.perform(post("/api/admin/otp/unblock")
+                        .header("Authorization", "Bearer " + r.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("email", "kimdir@dokon.uz")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void noToken_unblockOtp_401() throws Exception {
+        mvc.perform(post("/api/admin/otp/unblock")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("email", "kimdir@dokon.uz")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void superAdmin_unblockOtp_200() throws Exception {
+        RegResult admin = registerAndLogin(uniquePhone());
+        makeSuperAdmin(admin.phone());
+        mvc.perform(post("/api/admin/otp/unblock")
+                        .header("Authorization", "Bearer " + admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("email", "kimdir@dokon.uz")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.message").value("OTP bloki bekor qilindi."));
     }
 }

@@ -30,7 +30,7 @@ public class AuthController {
         this.config = config;
     }
 
-    public record SendOtpRequest(String phone) { }
+    public record SendOtpRequest(String email) { }
     public record RegisterRequest(String name, String phone, String email, String password, String code) { }
     public record LoginRequest(String identifier, String password) { }
 
@@ -38,20 +38,26 @@ public class AuthController {
     private static final java.util.regex.Pattern EMAIL_RX =
             java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
-    /** Telefonga tasdiqlash kodi yuboradi (registratsiyadan oldin). */
+    /** Email manzilga tasdiqlash kodi yuboradi (registratsiyadan oldin). */
     @PostMapping("/send-otp")
     public ResponseEntity<?> sendOtp(@RequestBody SendOtpRequest req) {
-        if (isBlank(req.phone())) {
-            return err(HttpStatus.BAD_REQUEST, "Telefon raqam kiritilishi shart.");
+        if (isBlank(req.email())) {
+            return err(HttpStatus.BAD_REQUEST, "Email kiritilishi shart.");
+        }
+        // Email formatini tekshiramiz (lokal@domen.tld).
+        if (!EMAIL_RX.matcher(req.email().trim()).matches()) {
+            return err(HttpStatus.BAD_REQUEST, "Email formati noto'g'ri.");
         }
         try {
-            String code = otp.sendCode(req.phone());
+            String code = otp.sendCode(req.email());
             Map<String, Object> body = new java.util.HashMap<>();
             body.put("message", "Tasdiqlash kodi yuborildi.");
             if (config.isOtpExposeCode()) body.put("devCode", code); // faqat dev flag yoqilganda
             return ResponseEntity.ok(body);
         } catch (OtpService.TooSoonException e) {
             return err(HttpStatus.TOO_MANY_REQUESTS, "Kod yaqinda yuborilgan. Biroz kuting.");
+        } catch (OtpService.BlockedException e) {
+            return err(HttpStatus.TOO_MANY_REQUESTS, blockedMessage(e));
         }
     }
 
@@ -71,8 +77,12 @@ public class AuthController {
         if (req.password().length() < 6) {
             return err(HttpStatus.BAD_REQUEST, "Parol kamida 6 belgidan iborat bo'lsin.");
         }
-        if (!otp.verify(req.phone(), req.code())) {
-            return err(HttpStatus.BAD_REQUEST, "Tasdiqlash kodi noto'g'ri yoki muddati o'tgan.");
+        try {
+            if (!otp.verify(req.email(), req.code())) {
+                return err(HttpStatus.BAD_REQUEST, "Tasdiqlash kodi noto'g'ri yoki muddati o'tgan.");
+            }
+        } catch (OtpService.BlockedException e) {
+            return err(HttpStatus.TOO_MANY_REQUESTS, blockedMessage(e));
         }
         try {
             Client c = auth.register(req.name(), req.phone(), req.email(), req.password());
@@ -111,6 +121,16 @@ public class AuthController {
 
     private static boolean isBlank(String s) {
         return s == null || s.isBlank();
+    }
+
+    /** Bloklash xabari — qancha kutish kerakligini (daqiqa/soniya) o'zbekcha bildiradi. */
+    private static String blockedMessage(OtpService.BlockedException e) {
+        long secs = e.getRemainingSeconds();
+        if (secs >= 60) {
+            long mins = (secs + 59) / 60; // yuqoriga yaxlitlab daqiqa
+            return "Juda ko'p urinish. " + mins + " daqiqadan so'ng qayta urinib ko'ring.";
+        }
+        return "Juda ko'p urinish. " + secs + " soniyadan so'ng qayta urinib ko'ring.";
     }
 
     private ResponseEntity<Map<String, String>> err(HttpStatus status, String message) {

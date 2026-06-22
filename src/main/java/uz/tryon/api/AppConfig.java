@@ -49,6 +49,15 @@ public class AppConfig {
     /** Dev: true bo'lsa send-otp javobida kod ham qaytadi (frontend toast uchun). Production'da false! */
     private boolean otpExposeCode = false;
 
+    /** Email provayder nomi (masalan "resend"). Bo'sh = log rejimi (real email yuborilmaydi). */
+    private String mailProvider = "";
+
+    /** Email "from" manzili (masalan noreply@trysima.uz). Bo'sh = log rejimi. */
+    private String mailFrom = "";
+
+    /** Resend API kaliti. Bo'sh = log rejimi. Domen tayyor bo'lganda to'ldiriladi. */
+    private String resendApiKey = "";
+
     /** Redis URL (rate limit uchun). Bo'sh = xotirada (in-memory) ishlaydi. */
     private String redisUrl = "";
 
@@ -159,6 +168,15 @@ public class AppConfig {
 
     public boolean isPoseEnabled() { return poseEnabled; }
     public void setPoseEnabled(boolean v) { this.poseEnabled = v; }
+
+    public String getMailProvider() { return mailProvider; }
+    public void setMailProvider(String v) { this.mailProvider = v; }
+
+    public String getMailFrom() { return mailFrom; }
+    public void setMailFrom(String v) { this.mailFrom = v; }
+
+    public String getResendApiKey() { return resendApiKey; }
+    public void setResendApiKey(String v) { this.resendApiKey = v; }
 
     public String getRedisUrl() { return redisUrl; }
     public void setRedisUrl(String v) { this.redisUrl = v; }

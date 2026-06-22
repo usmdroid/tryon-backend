@@ -33,6 +33,9 @@ Barcha sozlamalar env orqali. Lokalda `application.yml` dagi default qiymatlar i
 | `TRYON_ALLOWED_ORIGINS` | Ruxsat domenlar (vergul bilan) | (bo'sh = hammasi) |
 | `TRYON_RATE_LIMIT` | Daqiqasiga maks so'rov | 5 |
 | `REDIS_URL` | Redis URL (rate limit uchun) | (bo'sh = xotirada ishlaydi) |
+| `MAIL_PROVIDER` | Email provayder ("resend") | (bo'sh = log rejimi) |
+| `MAIL_FROM` | "From" manzili (masalan noreply@trysima.uz) | (bo'sh = log rejimi) |
+| `RESEND_API_KEY` | Resend API kaliti | (bo'sh = log rejimi) |
 | `R2_ENDPOINT` | Cloudflare R2 endpoint URL | (bo'sh = saqlash o'chiq) |
 | `R2_BUCKET` | R2 bucket nomi | (bo'sh = saqlash o'chiq) |
 | `R2_ACCESS_KEY` | R2 access key | (bo'sh = saqlash o'chiq) |
@@ -73,6 +76,31 @@ Faqat natija rasmlari saqlanadi (`results/<clientId>/<uuid>.webp`).
 Kirish rasmlari (shaxs/kiyim) hech qachon saqlanmaydi — maxfiylik.
 Saqlash muddati `TRYON_RESULT_RETENTION_DAYS` bilan hujjatlanadi; haqiqiy muddatni
 R2 lifecycle qoidasida o'rnatish kerak (kod buni boshqarmaydi).
+
+### Email orqali OTP (tasdiqlash kodi)
+
+Registratsiyadan oldin `POST /api/auth/send-otp` 6 xonali kodni foydalanuvchi
+**email** manziliga yuboradi. Kod email bo'yicha xotirada saqlanadi (TTL
+`TRYON_OTP_TTL_SECONDS`), keyin `register` o'sha email bo'yicha tekshiriladi.
+
+**Log rejimi (default):** `MAIL_PROVIDER`, `MAIL_FROM`, `RESEND_API_KEY` bo'sh bo'lsa
+real email **yuborilmaydi** — kod faqat server log'iga yoziladi (WARN: "email provider
+ulanmagan — kod log'ga yozildi"). Bu dev/test'ni env'siz ishlatish uchun.
+
+**Domen tayyor bo'lganda yoqish:**
+
+1. Domen oling va Resend'da uni tasdiqlang (DNS yozuvlari: SPF/DKIM).
+2. Resend'da API kalit yarating.
+3. Quyidagi env o'zgaruvchilarni bering:
+   ```
+   MAIL_PROVIDER=resend
+   MAIL_FROM=noreply@<sizning-domeningiz>   # masalan noreply@trysima.uz
+   RESEND_API_KEY=<resend-api-kalit>
+   ```
+4. Serverni qayta ishga tushiring. Kodga tegmasdan real email yuborish boshlanadi.
+
+Uchta qiymatdan birortasi bo'sh bo'lsa — tizim avtomatik log rejimida qoladi
+(yarim-sozlangan holatda real email yuborilmaydi).
 
 ## API
 

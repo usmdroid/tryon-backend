@@ -44,7 +44,7 @@ class ApiKeyTest {
 
     private String registerAndLogin(String phone) throws Exception {
         mvc.perform(post("/api/auth/send-otp").contentType(MediaType.APPLICATION_JSON)
-                .content(json("phone", phone))).andExpect(status().isOk());
+                .content(json("email", phone.replaceAll("\\D", "") + "@test.uz"))).andExpect(status().isOk());
         MvcResult r = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                         .content(json("name", "User " + phone, "phone", phone,
                                 "email", phone.replaceAll("\\D", "") + "@test.uz",
