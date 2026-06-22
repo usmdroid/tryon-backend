@@ -8,6 +8,11 @@ spring:
     multipart:
       max-request-size: 16MB
       max-file-size: 16MB
+  # Redis autoconfiguratsiyasini o'chiramiz — RedisConfig.java shartli ulanadi.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
 
   # PostgreSQL — Railway PG* o'zgaruvchilaridan (lokalda localhost default).
   # Railway: backend servisiga Postgres'ning PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD
@@ -62,6 +67,16 @@ tryon:
   otp-fixed-code: ${TRYON_OTP_FIXED_CODE:123456}
   # Dev: kodni send-otp javobida qaytarish (frontend toast). Production'da false!
   otp-expose-code: ${TRYON_OTP_EXPOSE_CODE:false}
+
+  # Redis (rate limit uchun). Bo'sh = xotirada ishlaydi (lokal/test uchun).
+  redis-url: ${REDIS_URL:}
+
+  # R2 saqlash (faqat natija rasmi, kirish rasmlari saqlanmaydi — maxfiylik).
+  # Bo'sh = saqlash o'chiq (lokal/test uchun).
+  r2-endpoint: ${R2_ENDPOINT:}
+  r2-bucket: ${R2_BUCKET:}
+  r2-access-key: ${R2_ACCESS_KEY:}
+  r2-secret-key: ${R2_SECRET_KEY:}
 
   # ML detektorlar — default O'CHIQ (xotira tejash). Try-on ustida ishlaganda yoqing:
   #   TRYON_YOLO_ENABLED=true va TRYON_POSE_ENABLED=true

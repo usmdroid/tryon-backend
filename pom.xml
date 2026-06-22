@@ -41,6 +41,19 @@
             <version>8.10.1</version>
         </dependency>
 
+        <!-- Redis (rate limiter uchun) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- R2/S3 saqlash (natija rasmlari) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.26.7</version>
+        </dependency>
+
         <!-- WebP o'qish (ImageIO WebP'ni o'zi qo'llab-quvvatlamaydi) -->
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>

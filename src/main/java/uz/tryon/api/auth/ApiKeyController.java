@@ -50,7 +50,6 @@ public class ApiKeyController {
             m.put("id", k.getId());
             m.put("name", k.getName());
             m.put("keyPrefix", k.getKeyPrefix());
-            m.put("key", apiKeyService.revealKey(k));
             m.put("createdAt", k.getCreatedAt());
             m.put("lastUsedAt", k.getLastUsedAt());
             m.put("revokedAt", k.getRevokedAt());

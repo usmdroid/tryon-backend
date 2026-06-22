@@ -49,6 +49,21 @@ public class AppConfig {
     /** Dev: true bo'lsa send-otp javobida kod ham qaytadi (frontend toast uchun). Production'da false! */
     private boolean otpExposeCode = false;
 
+    /** Redis URL (rate limit uchun). Bo'sh = xotirada (in-memory) ishlaydi. */
+    private String redisUrl = "";
+
+    /** R2 endpoint (natija saqlash uchun). Bo'sh = saqlash o'chiq. */
+    private String r2Endpoint = "";
+
+    /** R2 bucket nomi. */
+    private String r2Bucket = "";
+
+    /** R2 access key. */
+    private String r2AccessKey = "";
+
+    /** R2 secret key. */
+    private String r2SecretKey = "";
+
     /** ML detektorlarni yoqish (xotira tejash uchun). false = /check o'sha tekshiruvni skip qiladi, model yuklanmaydi. */
     private boolean yoloEnabled = true;
     private boolean poseEnabled = true;
@@ -144,4 +159,19 @@ public class AppConfig {
 
     public boolean isPoseEnabled() { return poseEnabled; }
     public void setPoseEnabled(boolean v) { this.poseEnabled = v; }
+
+    public String getRedisUrl() { return redisUrl; }
+    public void setRedisUrl(String v) { this.redisUrl = v; }
+
+    public String getR2Endpoint() { return r2Endpoint; }
+    public void setR2Endpoint(String v) { this.r2Endpoint = v; }
+
+    public String getR2Bucket() { return r2Bucket; }
+    public void setR2Bucket(String v) { this.r2Bucket = v; }
+
+    public String getR2AccessKey() { return r2AccessKey; }
+    public void setR2AccessKey(String v) { this.r2AccessKey = v; }
+
+    public String getR2SecretKey() { return r2SecretKey; }
+    public void setR2SecretKey(String v) { this.r2SecretKey = v; }
 }

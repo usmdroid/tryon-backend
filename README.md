@@ -32,6 +32,47 @@ Barcha sozlamalar env orqali. Lokalda `application.yml` dagi default qiymatlar i
 | `TRYON_API_KEYS` | Sotuvchi kalitlari (vergul bilan) | test-key-12345 |
 | `TRYON_ALLOWED_ORIGINS` | Ruxsat domenlar (vergul bilan) | (bo'sh = hammasi) |
 | `TRYON_RATE_LIMIT` | Daqiqasiga maks so'rov | 5 |
+| `REDIS_URL` | Redis URL (rate limit uchun) | (bo'sh = xotirada ishlaydi) |
+| `R2_ENDPOINT` | Cloudflare R2 endpoint URL | (bo'sh = saqlash o'chiq) |
+| `R2_BUCKET` | R2 bucket nomi | (bo'sh = saqlash o'chiq) |
+| `R2_ACCESS_KEY` | R2 access key | (bo'sh = saqlash o'chiq) |
+| `R2_SECRET_KEY` | R2 secret key | (bo'sh = saqlash o'chiq) |
+| `TRYON_RESULT_RETENTION_DAYS` | Natija saqlash muddati (kun) | 7 (lifecycle qoidasi orqali) |
+
+### Redis ulanish formatlari
+
+```
+REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://:password@host:6379
+REDIS_URL=redis://user:password@host:6379/0
+```
+
+Sozlanmasa server xotirada ishlaydi (lokal/test uchun qulay).
+
+### R2 natijalarini saqlash sozlamasi
+
+Cloudflare R2 darmonida yoqish:
+
+1. R2 bucket yarating (masalan `sima-results`).
+2. API token yarating: Object Read & Write + Bucket-level ruxsat.
+3. Quyidagi env o'zgaruvchilarni bering:
+   ```
+   R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+   R2_BUCKET=sima-results
+   R2_ACCESS_KEY=<access-key-id>
+   R2_SECRET_KEY=<secret-access-key>
+   ```
+
+**Avto-o'chirish (7 kun lifecycle):**
+Cloudflare R2 → bucket → Settings → Lifecycle rules:
+- Rule name: `delete-results`
+- Prefix: `results/`
+- Days until expiry: `7` (yoki `TRYON_RESULT_RETENTION_DAYS` da belgilangan qiymat)
+
+Faqat natija rasmlari saqlanadi (`results/<clientId>/<uuid>.webp`).
+Kirish rasmlari (shaxs/kiyim) hech qachon saqlanmaydi — maxfiylik.
+Saqlash muddati `TRYON_RESULT_RETENTION_DAYS` bilan hujjatlanadi; haqiqiy muddatni
+R2 lifecycle qoidasida o'rnatish kerak (kod buni boshqarmaydi).
 
 ## API
 
@@ -110,9 +151,9 @@ Eslatma: detektorlar haqiqiy fotosuratlar uchun. Ikona/multik kabi tekis rasmlar
 
 ## Keyingi bosqichlar (backend dev uchun)
 
-- Imzolangan token (HMAC/JWT + nonce) qo'shish.
+- ✅ Imzolangan token (HMAC + nonce) qo'shildi.
 - ✅ Yuz/poza/tana detektori — `/api/check` (MoveNet) qo'shildi.
-- PostgreSQL: API kalitlar va billing.
+- ✅ PostgreSQL: API kalitlar va billing qo'shildi.
+- ✅ Rasm natijasini R2/S3'ga saqlash — `StorageService` qo'shildi.
+- ✅ Rate limit Redis bilan (ko'p server uchun) — `RateLimiterService` yangilandi.
 - Modal tarafida secret tekshiruvini yoqish.
-- Rasm vaqtinchalik saqlash (S3/R2) + avtomatik o'chirish.
-- Rate limit'ni Redis bilan (ko'p server uchun).

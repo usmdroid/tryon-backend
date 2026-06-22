@@ -2,34 +2,83 @@ package uz.tryon.api;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Rate limiting — har API kalit uchun alohida "bucket".
+ * Rate limiting — har API kalit (clientId) uchun daqiqasiga cheklangan so'rov.
  *
- * Bu eng muhim himoya: GPU xarajatini portlashdan saqlaydi.
- * Bitta kalit daqiqasiga belgilangan sondan ortiq so'rov yubora olmaydi.
+ * Redis mavjud bo'lsa: umumiy hisoblagich (bir nechta server uchun to'g'ri).
+ * Redis yo'q bo'lsa: xotira (in-memory) — lokal/dev/test uchun.
  *
- * Eslatma: hozir xotirada (in-memory). Bir nechta server bo'lsa (scale),
- * Redis bilan umumiy bucket kerak bo'ladi — backend dev buni keyin qo'shadi.
+ * Public interfeys o'zgarmaydi: callerlar faqat allow(clientId) chaqiradi.
  */
 @Service
 public class RateLimiterService {
 
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
-    private final AppConfig config;
+    private static final Logger log = LoggerFactory.getLogger(RateLimiterService.class);
 
-    public RateLimiterService(AppConfig config) {
-        this.config = config;
+    private final AppConfig config;
+    private final StringRedisTemplate redisTemplate; // null = in-memory rejimi
+    private final Map<String, Bucket> inMemoryBuckets = new ConcurrentHashMap<>();
+
+    /** Atom INCR + birinchi so'rovda TTL o'rnatish (fixed-window, ~1 daqiqa). */
+    private static final DefaultRedisScript<Long> RATE_SCRIPT;
+
+    static {
+        DefaultRedisScript<Long> s = new DefaultRedisScript<>();
+        s.setScriptText(
+            "local cur = redis.call('INCR', KEYS[1])\n" +
+            "if cur == 1 then redis.call('EXPIRE', KEYS[1], 60) end\n" +
+            "return cur"
+        );
+        s.setResultType(Long.class);
+        RATE_SCRIPT = s;
     }
 
-    /** Shu kalit hozir so'rov yubora oladimi? false = limit oshgan. */
-    public boolean allow(String apiKey) {
-        Bucket bucket = buckets.computeIfAbsent(apiKey, k -> newBucket());
+    public RateLimiterService(AppConfig config, Optional<StringRedisTemplate> redisTemplate) {
+        this.config = config;
+        this.redisTemplate = redisTemplate.orElse(null);
+        if (this.redisTemplate != null) {
+            log.info("Rate limiter: Redis rejimida (daqiqasiga {} so'rov)", config.getRateLimitPerMinute());
+        } else {
+            log.info("Rate limiter: xotirada (in-memory) rejimida");
+        }
+    }
+
+    /** Shu clientId hozir so'rov yubora oladimi? false = limit oshgan. */
+    public boolean allow(String clientId) {
+        if (redisTemplate != null) {
+            return allowWithRedis(clientId);
+        }
+        return allowInMemory(clientId);
+    }
+
+    private boolean allowWithRedis(String clientId) {
+        // Kalit: daqiqa oynasi bo'yicha (fixed window)
+        long window = System.currentTimeMillis() / 60_000L;
+        String key = "rate:" + clientId + ":" + window;
+        try {
+            Long count = redisTemplate.execute(RATE_SCRIPT, List.of(key));
+            return count != null && count <= config.getRateLimitPerMinute();
+        } catch (Exception e) {
+            // Redis muammo — in-memory ga tushib ketamiz, so'rov yo'qolmaydi
+            log.error("Redis rate limit xatosi, in-memory ga o'tildi: {}", e.getMessage());
+            return allowInMemory(clientId);
+        }
+    }
+
+    private boolean allowInMemory(String clientId) {
+        Bucket bucket = inMemoryBuckets.computeIfAbsent(clientId, k -> newBucket());
         return bucket.tryConsume(1);
     }
 

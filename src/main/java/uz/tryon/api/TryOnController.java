@@ -37,11 +37,13 @@ public class TryOnController {
     private final TokenService tokenService;
     private final ApiKeyService apiKeyService;
     private final CreditService creditService;
+    private final StorageService storageService;
 
     public TryOnController(AppConfig config, RateLimiterService rateLimiter,
                            ImageValidator validator, ImageCheckService checkService,
                            ModalClient modal, TokenService tokenService,
-                           ApiKeyService apiKeyService, CreditService creditService) {
+                           ApiKeyService apiKeyService, CreditService creditService,
+                           StorageService storageService) {
         this.config = config;
         this.rateLimiter = rateLimiter;
         this.validator = validator;
@@ -50,6 +52,7 @@ public class TryOnController {
         this.tokenService = tokenService;
         this.apiKeyService = apiKeyService;
         this.creditService = creditService;
+        this.storageService = storageService;
     }
 
     /**
@@ -157,7 +160,12 @@ public class TryOnController {
             return err(HttpStatus.BAD_GATEWAY, result.error());
         }
 
-        // 7. Natija rasmni qaytarish (WebP)
+        // 7. Natijani R2'ga yuklash — fon ipida, javobni kechiktirmaydi (faqat ma'lum mijozlar uchun)
+        if (clientUUID != null) {
+            storageService.uploadAsync(result.image(), clientUUID);
+        }
+
+        // 8. Natija rasmni qaytarish (WebP)
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("image/webp"))
                 .body(result.image());
