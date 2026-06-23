@@ -11,5 +11,16 @@ FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
-# Heap'ga ~55% (qolgani ONNX native off-heap + metaspace uchun), kam xotirali GC
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=55.0", "-XX:+UseSerialGC", "-XX:MaxMetaspaceSize=192m", "-jar", "/app/app.jar"]
+# Xotira optimallashuvi (kichik Railway instansi uchun):
+#  - MaxRAMPercentage 45% — operatsion tizim/native (ImageIO/Tomcat)/metaspace uchun joy
+#  - SerialGC — kam xotirali, single-thread (kichik instans uchun ideal)
+#  - MaxMetaspaceSize 160m — class metadata cheklash
+#  - ReservedCodeCacheSize 48m — JIT cache cheklash
+#  - ExitOnOutOfMemoryError — OOM bo'lsa darhol chiqsin (Railway qayta tushiradi, hang'da turmaydi)
+ENTRYPOINT ["java", \
+  "-XX:MaxRAMPercentage=45.0", \
+  "-XX:+UseSerialGC", \
+  "-XX:MaxMetaspaceSize=160m", \
+  "-XX:ReservedCodeCacheSize=48m", \
+  "-XX:+ExitOnOutOfMemoryError", \
+  "-jar", "/app/app.jar"]

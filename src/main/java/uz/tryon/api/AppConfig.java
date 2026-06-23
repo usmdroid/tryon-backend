@@ -77,6 +77,9 @@ public class AppConfig {
     private boolean yoloEnabled = true;
     private boolean poseEnabled = true;
 
+    /** Texnik tanaffus — true bo'lsa /session, /check, /tryon endpoint'lari 503 qaytaradi (xotira tejash). */
+    private boolean maintenance = false;
+
     /** Sifat tekshiruvi chegaralari (POST /api/check uchun). */
     private final Check check = new Check();
 
@@ -168,6 +171,9 @@ public class AppConfig {
 
     public boolean isPoseEnabled() { return poseEnabled; }
     public void setPoseEnabled(boolean v) { this.poseEnabled = v; }
+
+    public boolean isMaintenance() { return maintenance; }
+    public void setMaintenance(boolean v) { this.maintenance = v; }
 
     public String getMailProvider() { return mailProvider; }
     public void setMailProvider(String v) { this.mailProvider = v; }

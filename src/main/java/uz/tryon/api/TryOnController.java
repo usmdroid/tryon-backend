@@ -67,6 +67,7 @@ public class TryOnController {
      */
     @PostMapping("/session")
     public ResponseEntity<?> session(@RequestHeader(value = "X-Api-Key", required = false) String apiKey) {
+        if (config.isMaintenance()) return maintenance();
         if (apiKey == null) {
             return err(HttpStatus.UNAUTHORIZED, "API kalit noto'g'ri yoki yo'q.");
         }
@@ -117,6 +118,7 @@ public class TryOnController {
             @RequestHeader(value = "Origin", required = false) String origin,
             @RequestBody Map<String, String> payload) {
 
+        if (config.isMaintenance()) return maintenance();
         // 1. Autentifikatsiya — Bearer token (bir martali) yoki X-Api-Key
         TokenService.Verified verified = authenticate(apiKey, auth, true);
         if (verified == null) {
@@ -200,6 +202,7 @@ public class TryOnController {
             @RequestHeader(value = "Authorization", required = false) String auth,
             @RequestBody Map<String, String> payload) {
 
+        if (config.isMaintenance()) return maintenance();
         // Bearer token (consume QILMAYDI — arzon amal) yoki X-Api-Key
         TokenService.Verified verified = authenticate(apiKey, auth, false);
         if (verified == null) {
@@ -224,6 +227,12 @@ public class TryOnController {
     @GetMapping("/health")
     public Map<String, String> health() {
         return Map.of("status", "ok");
+    }
+
+    /** Texnik tanaffus rejimi — rasm endpoint'lari uchun. */
+    private ResponseEntity<Map<String, String>> maintenance() {
+        return err(HttpStatus.SERVICE_UNAVAILABLE,
+                "Xizmat texnik tanaffusda. Iltimos, biroz keyin urinib ko'ring.");
     }
 
     private ResponseEntity<Map<String, String>> err(HttpStatus status, String message) {

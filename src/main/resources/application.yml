@@ -1,5 +1,12 @@
 server:
   port: ${PORT:8080}
+  # Tomcat thread/connection cheklash — xotira tejash (kam yuk uchun).
+  tomcat:
+    threads:
+      max: ${TRYON_TOMCAT_THREADS:25}      # default 200; 25 bemalol yetadi
+      min-spare: ${TRYON_TOMCAT_MIN_SPARE:5}
+    max-connections: ${TRYON_TOMCAT_MAX_CONN:200}
+    accept-count: 20
 
 spring:
   application:
@@ -21,6 +28,10 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:sima}}
     username: ${PGUSER:sima}
     password: ${PGPASSWORD:sima}
+    # DB pool kichik — bitta-ikkita ulanish yetadi (kam foydalanuvchi, xotira tejash).
+    hikari:
+      maximum-pool-size: ${TRYON_DB_POOL_MAX:5}
+      minimum-idle: 1
   jpa:
     hibernate:
       ddl-auto: none   # sxemani to'liq Flyway boshqaradi (Hibernate o'zgartirmaydi/tekshirmaydi)
@@ -35,6 +46,12 @@ spring:
 # Try-on sozlamalari — barchasi env o'zgaruvchilardan (lokalda default qiymatlar).
 # Production'da bularni platforma (Railway/Render) env sozlamalarida beriladi.
 tryon:
+  # Texnik tanaffus rejimi (xotira tejash) — true bo'lsa /session, /check, /tryon
+  # 503 qaytaradi, kirish rasm so'rovi umuman decode qilinmaydi.
+  # Auth, kabinet, monitoring, admin BARIBIR ishlaydi.
+  # Yoqish: Railway env TRYON_MAINTENANCE=true.
+  maintenance: ${TRYON_MAINTENANCE:false}
+
   # Modal web endpoint (deploy qilingan)
   modal-url: ${TRYON_MODAL_URL:https://elusm17--catvton-tryon-tryon-tryon-api.modal.run}
 
