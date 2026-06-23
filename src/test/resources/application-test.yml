@@ -15,6 +15,10 @@ spring:
 # Test/dev: OTP kodi doim shu (log rejimida kodni log'dan o'qishsiz test qilish uchun)
 tryon:
   otp-fixed-code: "123456"
+  # Testlar real email yubormasin — provayderni o'chiramiz (log rejimi).
+  # (main yml'da default "resend" — bu yerda bo'sh qilib bekor qilamiz.)
+  mail-provider: ""
+  resend-api-key: ""
   # Testlarda ML detektorlar yoniq (CheckEndpointTest ularni sinaydi)
   yolo-enabled: true
   pose-enabled: true
