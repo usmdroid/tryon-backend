@@ -97,6 +97,45 @@ public interface CreditTransactionRepository extends JpaRepository<CreditTransac
     long countHistory(@Param("clientId") UUID clientId,
                       @Param("apiKeyId") String apiKeyId);
 
+    // ---- Global Admin Monitoring agregatlari (barcha mijozlar, clientId filtrisiz) ----
+
+    /** Barcha TRYON_DEBIT qatorlari soni bir vaqt chegarasidan beri (global). */
+    @Query("SELECT COUNT(t) FROM CreditTransaction t WHERE t.type = 'TRYON_DEBIT' AND t.createdAt >= :since")
+    long countGlobalDebitsSince(@Param("since") Instant since);
+
+    /** Barcha muvaffaqiyatsiz TRYON_DEBIT soni: meta null emas va bo'sh emas = xato. */
+    @Query(value = "SELECT COUNT(*) FROM credit_transactions "
+            + "WHERE type = 'TRYON_DEBIT' AND created_at >= :since "
+            + "AND meta IS NOT NULL AND meta <> ''", nativeQuery = true)
+    long countGlobalFailedSince(@Param("since") Instant since);
+
+    /** Top N mijozlar TRYON_DEBIT soni bo'yicha (mijoz nomi bilan). */
+    @Query(value = "SELECT t.client_id AS client_id, c.name AS name, "
+            + "COUNT(*) AS requests, COALESCE(SUM(ABS(t.amount_msim)), 0) AS spent_msim "
+            + "FROM credit_transactions t JOIN clients c ON c.id = t.client_id "
+            + "WHERE t.type = 'TRYON_DEBIT' "
+            + "GROUP BY t.client_id, c.name "
+            + "ORDER BY requests DESC "
+            + "LIMIT :limit", nativeQuery = true)
+    List<GlobalTopClientRow> globalTopClients(@Param("limit") int limit);
+
+    /** Barcha mijozlar bo'yicha global vaqt seriyasi (clientId filtrisiz). */
+    @Query(value = "SELECT date_trunc(:bucket, created_at) AS ts, "
+            + "COUNT(*) AS cnt, COALESCE(SUM(ABS(amount_msim)), 0) AS spent_msim "
+            + "FROM credit_transactions "
+            + "WHERE type = 'TRYON_DEBIT' AND created_at >= :since "
+            + "GROUP BY 1 ORDER BY 1 ASC", nativeQuery = true)
+    List<TimeBucketRow> globalTimeseries(@Param("bucket") String bucket,
+                                         @Param("since") Instant since);
+
+    /** Global top client qatori proyeksiyasi. */
+    interface GlobalTopClientRow {
+        UUID getClientId();
+        String getName();
+        long getRequests();
+        long getSpentMsim();
+    }
+
     /** by-key agregat qatori proyeksiyasi. */
     interface KeyUsageRow {
         UUID getApiKeyId();
