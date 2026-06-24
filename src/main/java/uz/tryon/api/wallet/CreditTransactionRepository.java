@@ -58,8 +58,8 @@ public interface CreditTransactionRepository extends JpaRepository<CreditTransac
             + "WHERE client_id = :clientId AND type = 'TRYON_DEBIT' "
             + "AND created_at >= :since "
             + "AND (CAST(:apiKeyId AS uuid) IS NULL OR api_key_id = CAST(:apiKeyId AS uuid)) "
-            + "GROUP BY date_trunc(:bucket, created_at) "
-            + "ORDER BY date_trunc(:bucket, created_at) ASC", nativeQuery = true)
+            + "GROUP BY 1 "
+            + "ORDER BY 1 ASC", nativeQuery = true)
     List<TimeBucketRow> aggregateTimeseries(@Param("clientId") UUID clientId,
                                             @Param("bucket") String bucket,
                                             @Param("since") Instant since,
