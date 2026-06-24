@@ -77,4 +77,10 @@ public class Client {
 
     /** Holatni o'zgartirish (faqat @Transactional servis metodlari ichida ishlatiladi). */
     public void setStatus(String status) { this.status = status; }
+
+    /** Telefon raqamni o'zgartirish (faqat @Transactional servis metodlari ichida ishlatiladi). */
+    public void setPhone(String phone) { this.phone = phone; }
+
+    /** Email manzilni o'zgartirish (faqat @Transactional servis metodlari ichida ishlatiladi). */
+    public void setEmail(String email) { this.email = email; }
 }
