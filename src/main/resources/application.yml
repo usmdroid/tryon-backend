@@ -75,6 +75,10 @@ tryon:
   # Bo'sh = hech kim super-admin qilinmaydi. Kodda telefon yozilmaydi (faqat env).
   super-admin-phone: ${TRYON_SUPER_ADMIN_PHONE:${SUPER_ADMIN_PHONE:}}
 
+  # Demo seed: monitoring sahifalarini vizual tekshirish uchun demo ma'lumotlari.
+  # Faqat dev/staging uchun. Yoqish: TRYON_DEMO_SEED=true env.
+  demo-seed: ${TRYON_DEMO_SEED:false}
+
   # Sessiya tokeni (HMAC imzo) — Production'da TRYON_TOKEN_SECRET ni albatta o'rnating
   token-secret: ${TRYON_TOKEN_SECRET:dev-secret-change-me}
   token-ttl-seconds: ${TRYON_TOKEN_TTL_SECONDS:300}
