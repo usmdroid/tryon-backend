@@ -29,8 +29,8 @@ scp "$JAR" "$HOST:$REMOTE_PATH"
 echo "→ 3/4  Service qayta ishga tushirish..."
 ssh "$HOST" "systemctl restart $SERVICE"
 
-echo "→ 4/4  Startup'ni kutish (15s)..."
-sleep 15
+echo "→ 4/4  Startup'ni kutish (30s)..."
+sleep 30
 
 echo ""
 echo "─── Health check ───"
