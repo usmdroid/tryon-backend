@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthTest {
 
     @Autowired MockMvc mvc;
+    @Autowired ClientRepository clients;
     private final ObjectMapper mapper = new ObjectMapper();
     private static final String OTP = "123456"; // application-test.yml: otp-fixed-code
 
@@ -145,5 +146,25 @@ class AuthTest {
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(json("identifier", "+998901110008", "password", "boshqa999")))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void login_bloklangan_akkaunt_403_SUSPENDED() throws Exception {
+        String phone = "+998901110099";
+        String email = "blocked@dokon.uz";
+        sendOtp(email);
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("name", "A", "phone", phone, "email", email, "password", "parol123", "code", OTP)))
+                .andExpect(status().isOk());
+
+        Client c = clients.findByPhone(Phones.normalize(phone)).orElseThrow();
+        c.setStatus("SUSPENDED");
+        clients.save(c);
+
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("identifier", phone, "password", "parol123")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SUSPENDED"))
+                .andExpect(jsonPath("$.error").exists());
     }
 }

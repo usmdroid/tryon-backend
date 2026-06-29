@@ -39,6 +39,7 @@ public class AuthService {
     public static class EmailAlreadyExistsException extends RuntimeException { }
     public static class PhoneAlreadyExistsException extends RuntimeException { }
     public static class InvalidCredentialsException extends RuntimeException { }
+    public static class AccountSuspendedException extends RuntimeException { }
 
     /** Telefon va email — ikkalasi ham majburiy va unik. (Bo'sh email controllerda rad etiladi.) */
     public Client register(String name, String phone, String email, String password) {
@@ -63,6 +64,9 @@ public class AuthService {
                 .orElseThrow(InvalidCredentialsException::new);
         if (!encoder.matches(password, c.getPasswordHash())) {
             throw new InvalidCredentialsException();
+        }
+        if (!"ACTIVE".equals(c.getStatus())) {
+            throw new AccountSuspendedException();
         }
         return c;
     }

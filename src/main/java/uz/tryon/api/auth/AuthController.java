@@ -104,6 +104,13 @@ public class AuthController {
             return ok(c);
         } catch (AuthService.InvalidCredentialsException e) {
             return err(HttpStatus.UNAUTHORIZED, "Telefon/email yoki parol noto'g'ri.");
+        } catch (AuthService.AccountSuspendedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of(
+                            "error", "Akkauntingiz bloklangan. Iltimos, admin bilan bog'laning.",
+                            "code", "SUSPENDED"
+                    ));
         }
     }
 
