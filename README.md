@@ -169,7 +169,45 @@ Modellar (`src/main/resources/models/`, server startda bir marta yuklanadi):
 Eslatma: detektorlar haqiqiy fotosuratlar uchun. Ikona/multik kabi tekis rasmlar
 "odam topilmadi" deb rad etiladi (kutilgan).
 
-## Deploy (Railway / Render)
+## Deploy
+
+### Avto-deploy (GitHub Actions → Kamatera)
+
+`main`'ga push qilinganda `.github/workflows/deploy.yml` ishlaydi:
+testlar → build → JAR'ni serverga yuklash → `systemctl restart sima-backend` → health check.
+
+Manual ishga tushirish: GitHub → Actions → "Build & Deploy backend" → Run workflow.
+
+### Bir martalik sozlash
+
+**1. Server tarafda — GitHub uchun alohida deploy kaliti:**
+
+```bash
+# Lokalda yangi kalit yarating (parolsiz, alohida CI uchun):
+ssh-keygen -t ed25519 -f ~/.ssh/sima_deploy -C "github-actions" -N ""
+
+# Public kalitni serverga qo'shing (mavjudlariga qo'shimcha):
+ssh sima 'cat >> ~/.ssh/authorized_keys' < ~/.ssh/sima_deploy.pub
+```
+
+**2. GitHub'da secrets sozlash** (repo Settings → Secrets and variables → Actions → New repository secret):
+
+| Secret | Qiymat |
+|---|---|
+| `SSH_PRIVATE_KEY` | `~/.ssh/sima_deploy` faylining to'liq matni (`-----BEGIN OPENSSH PRIVATE KEY-----` dan to oxirgi `-----END...` qatorigacha) |
+| `SERVER_HOST` | `83.229.84.249` |
+| `SERVER_USER` | `root` |
+
+**3. GitHub'da `production` environment yarating** (Settings → Environments → New environment → `production`).
+Workflow `environment: production` ishlatadi — bu yerga reviewer/approval qo'yish mumkin (xavfsizlik uchun tavsiya).
+
+**4. Test:** kichik commit qiling va `main`'ga push qiling. Actions sahifasida progress ko'rinadi.
+
+### Qo'lda deploy (zaxira variant)
+
+`./deploy.sh` — lokal kompyuterdan to'g'ridan-to'g'ri. `~/.ssh/config` da `sima` host kerak.
+
+### Eski Railway/Render
 
 1. Bu papkani GitHub repo'ga yuklang.
 2. Railway/Render'da "New Project" → GitHub repo'ni ulang.
