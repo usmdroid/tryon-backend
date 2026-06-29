@@ -62,8 +62,17 @@ class AdminRbacTest {
 
     /** Rolni DB da SUPER_ADMIN ga o'zgartiradi (telefon bo'yicha topib). */
     private void makeSuperAdmin(String phone) {
+        setRoleInDb(phone, "SUPER_ADMIN");
+    }
+
+    /** Rolni DB da MODERATOR ga o'zgartiradi (telefon bo'yicha topib). */
+    private void makeModerator(String phone) {
+        setRoleInDb(phone, "MODERATOR");
+    }
+
+    private void setRoleInDb(String phone, String role) {
         Client c = clients.findByPhone(Phones.normalize(phone)).orElseThrow();
-        c.setRole("SUPER_ADMIN");
+        c.setRole(role);
         clients.save(c);
     }
 
@@ -180,5 +189,103 @@ class AdminRbacTest {
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .jsonPath("$.message").value("OTP bloki bekor qilindi."));
+    }
+
+    // ─── MODERATOR rol testlari ──────────────────────────────────────────────
+
+    @Test
+    void moderator_listClients_200() throws Exception {
+        RegResult r = registerAndLogin(uniquePhone());
+        makeModerator(r.phone());
+        mvc.perform(get("/api/admin/clients").header("Authorization", "Bearer " + r.token()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void moderator_suspendActivate_200() throws Exception {
+        RegResult mod = registerAndLogin(uniquePhone());
+        makeModerator(mod.phone());
+
+        RegResult target = registerAndLogin(uniquePhone());
+        String targetId = clients.findByPhone(Phones.normalize(target.phone())).orElseThrow().getId().toString();
+
+        mvc.perform(post("/api/admin/clients/" + targetId + "/suspend")
+                        .header("Authorization", "Bearer " + mod.token()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/admin/clients/" + targetId + "/activate")
+                        .header("Authorization", "Bearer " + mod.token()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void moderator_credit_403() throws Exception {
+        RegResult mod = registerAndLogin(uniquePhone());
+        makeModerator(mod.phone());
+
+        RegResult target = registerAndLogin(uniquePhone());
+        String targetId = clients.findByPhone(Phones.normalize(target.phone())).orElseThrow().getId().toString();
+
+        mvc.perform(post("/api/admin/clients/" + targetId + "/credit")
+                        .header("Authorization", "Bearer " + mod.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("amountSim", 10)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void moderator_setRole_403() throws Exception {
+        RegResult mod = registerAndLogin(uniquePhone());
+        makeModerator(mod.phone());
+
+        RegResult target = registerAndLogin(uniquePhone());
+        String targetId = clients.findByPhone(Phones.normalize(target.phone())).orElseThrow().getId().toString();
+
+        mvc.perform(post("/api/admin/clients/" + targetId + "/role")
+                        .header("Authorization", "Bearer " + mod.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("role", "MODERATOR")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void superAdmin_setRole_promotesAndDemotes() throws Exception {
+        RegResult admin = registerAndLogin(uniquePhone());
+        makeSuperAdmin(admin.phone());
+
+        RegResult target = registerAndLogin(uniquePhone());
+        String targetId = clients.findByPhone(Phones.normalize(target.phone())).orElseThrow().getId().toString();
+
+        // CLIENT -> MODERATOR
+        mvc.perform(post("/api/admin/clients/" + targetId + "/role")
+                        .header("Authorization", "Bearer " + admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("role", "MODERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.role").value("MODERATOR"));
+        assertTrue("MODERATOR".equals(clients.findById(java.util.UUID.fromString(targetId)).orElseThrow().getRole()));
+
+        // MODERATOR -> CLIENT
+        mvc.perform(post("/api/admin/clients/" + targetId + "/role")
+                        .header("Authorization", "Bearer " + admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("role", "CLIENT")))
+                .andExpect(status().isOk());
+        assertTrue("CLIENT".equals(clients.findById(java.util.UUID.fromString(targetId)).orElseThrow().getRole()));
+    }
+
+    @Test
+    void superAdmin_setRole_rejectsSuperAdminValue_400() throws Exception {
+        RegResult admin = registerAndLogin(uniquePhone());
+        makeSuperAdmin(admin.phone());
+
+        RegResult target = registerAndLogin(uniquePhone());
+        String targetId = clients.findByPhone(Phones.normalize(target.phone())).orElseThrow().getId().toString();
+
+        mvc.perform(post("/api/admin/clients/" + targetId + "/role")
+                        .header("Authorization", "Bearer " + admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("role", "SUPER_ADMIN")))
+                .andExpect(status().isBadRequest());
     }
 }

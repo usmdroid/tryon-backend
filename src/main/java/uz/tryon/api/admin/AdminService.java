@@ -44,4 +44,18 @@ public class AdminService {
         });
         return c;
     }
+
+    /**
+     * Mijoz rolini o'zgartiradi (faqat CLIENT yoki MODERATOR — super-admin UI orqali berilmaydi).
+     * Mijoz bo'lmasa — bo'sh Optional.
+     */
+    @Transactional
+    public Optional<Client> setRole(UUID clientId, String role) {
+        Optional<Client> c = clients.findById(clientId);
+        c.ifPresent(client -> {
+            client.setRole(role);
+            clients.save(client);
+        });
+        return c;
+    }
 }

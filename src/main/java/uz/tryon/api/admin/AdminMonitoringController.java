@@ -41,7 +41,7 @@ public class AdminMonitoringController {
             HttpServletRequest request,
             @RequestParam(defaultValue = "daily") String range) {
 
-        access.requireSuperAdmin(request);
+        access.requireStaff(request);
 
         ZonedDateTime now = Instant.now().atZone(ZoneOffset.UTC);
         Instant dayAgo   = now.minusDays(1).toInstant();

@@ -61,11 +61,12 @@ public class AdminController {
 
     public record CreditRequest(double amountSim) { }
     public record UnblockOtpRequest(String email) { }
+    public record RoleRequest(String role) { }
 
-    /** Barcha mijozlar ro'yxati (balans, so'rovlar, holat, rol). */
+    /** Barcha mijozlar ro'yxati (balans, so'rovlar, holat, rol). Xodim (moderator/super-admin). */
     @GetMapping("/clients")
     public ResponseEntity<?> listClients(HttpServletRequest request) {
-        access.requireSuperAdmin(request);
+        access.requireStaff(request);
 
         List<Map<String, Object>> result = clients.findAllByOrderByCreatedAtDesc().stream().map(c -> {
             Wallet w = wallets.findById(c.getId()).orElse(null);
@@ -83,10 +84,10 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
-    /** Bitta mijoz tafsilotlari + oxirgi tranzaksiyalar. 404 — topilmasa. */
+    /** Bitta mijoz tafsilotlari + oxirgi tranzaksiyalar. 404 — topilmasa. Xodim (moderator/super-admin). */
     @GetMapping("/clients/{id}")
     public ResponseEntity<?> clientDetail(@PathVariable UUID id, HttpServletRequest request) {
-        access.requireSuperAdmin(request);
+        access.requireStaff(request);
 
         Optional<Client> opt = clients.findById(id);
         if (opt.isEmpty()) return notFound();
@@ -138,26 +139,54 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("balanceSim", w.getBalanceMsim() / 1000.0));
     }
 
-    /** Mijozni to'xtatish (SUSPENDED). 404 — topilmasa. */
+    /** Mijozni to'xtatish (SUSPENDED). 404 — topilmasa. Xodim (moderator/super-admin). */
     @PostMapping("/clients/{id}/suspend")
     public ResponseEntity<?> suspend(@PathVariable UUID id, HttpServletRequest request) {
-        access.requireSuperAdmin(request);
+        access.requireStaff(request);
         if (adminService.suspend(id).isEmpty()) return notFound();
         return ResponseEntity.ok(Map.of("status", "SUSPENDED"));
     }
 
-    /** Mijozni faollashtirish (ACTIVE). 404 — topilmasa. */
+    /** Mijozni faollashtirish (ACTIVE). 404 — topilmasa. Xodim (moderator/super-admin). */
     @PostMapping("/clients/{id}/activate")
     public ResponseEntity<?> activate(@PathVariable UUID id, HttpServletRequest request) {
-        access.requireSuperAdmin(request);
+        access.requireStaff(request);
         if (adminService.activate(id).isEmpty()) return notFound();
         return ResponseEntity.ok(Map.of("status", "ACTIVE"));
     }
 
-    /** Umumiy statistika: mijozlar soni, jami so'rovlar (debit), jami tushum (PURCHASE). */
+    /**
+     * Mijoz rolini o'zgartirish (CLIENT yoki MODERATOR). Faqat super-admin.
+     * Super-adminni UI orqali tayinlash/bekor qilish mumkin emas.
+     * 400 — yaroqsiz rol yoki nishon super-admin. 404 — mijoz topilmasa.
+     */
+    @PostMapping("/clients/{id}/role")
+    public ResponseEntity<?> setRole(@PathVariable UUID id, @RequestBody RoleRequest req,
+                                     HttpServletRequest request) {
+        access.requireSuperAdmin(request);
+
+        if (req == null || req.role() == null) {
+            return err(HttpStatus.BAD_REQUEST, "Rol kiritilishi shart.");
+        }
+        String role = req.role().trim().toUpperCase();
+        if (!role.equals("CLIENT") && !role.equals("MODERATOR")) {
+            return err(HttpStatus.BAD_REQUEST, "Faqat CLIENT yoki MODERATOR rolini berish mumkin.");
+        }
+
+        Optional<Client> opt = clients.findById(id);
+        if (opt.isEmpty()) return notFound();
+        if ("SUPER_ADMIN".equals(opt.get().getRole())) {
+            return err(HttpStatus.BAD_REQUEST, "Super-admin rolini UI orqali o'zgartirib bo'lmaydi.");
+        }
+
+        adminService.setRole(id, role);
+        return ResponseEntity.ok(Map.of("role", role));
+    }
+
+    /** Umumiy statistika: mijozlar soni, jami so'rovlar (debit), jami tushum (PURCHASE). Xodim (moderator/super-admin). */
     @GetMapping("/stats")
     public ResponseEntity<?> stats(HttpServletRequest request) {
-        access.requireSuperAdmin(request);
+        access.requireStaff(request);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("totalClients", clients.count());
@@ -166,10 +195,10 @@ public class AdminController {
         return ResponseEntity.ok(body);
     }
 
-    /** OTP suiiste'mol blokini bekor qilish — blok + breach + eskalatsiya darajasini tozalaydi. */
+    /** OTP suiiste'mol blokini bekor qilish — blok + breach + eskalatsiya darajasini tozalaydi. Xodim (moderator/super-admin). */
     @PostMapping("/otp/unblock")
     public ResponseEntity<?> unblockOtp(@RequestBody UnblockOtpRequest req, HttpServletRequest request) {
-        access.requireSuperAdmin(request);
+        access.requireStaff(request);
         if (req == null || req.email() == null || req.email().isBlank()) {
             return err(HttpStatus.BAD_REQUEST, "Email kiritilishi shart.");
         }
