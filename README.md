@@ -267,6 +267,48 @@ curl -s -X POST https://sima-backend.railway.app/api/connect/exchange \
 Kalit olingandan so'ng plugin uni xavfsiz joyda (masalan, `.env` faylida) saqlaydi
 va `POST /api/tryon` da `X-Api-Key: sk_...` sifatida ishlatadi.
 
+## Modal HMAC secret — deploy steps
+
+Backend va Modal bir xil secret bilan ishlashi kerak. Birinchi marta sozlash:
+
+**1. Modal secret yarating:**
+```bash
+modal secret create sima-modal-secret SIMA_MODAL_SECRET=$(openssl rand -base64 32)
+```
+
+**2. Kamatera backend env'iga o'sha qiymatni qo'ying** (`/opt/sima/sima.env`):
+```
+TRYON_MODAL_SECRET=<openssl rand -base64 32 dan chiqqan qiymat>
+```
+Ikki tomonda bir xil bo'lishi shart.
+
+**3. NTP sinxronizatsiyasini tekshiring** (timestamp window ±5 daqiqa):
+```bash
+timedatectl status   # "NTP synchronized: yes" ko'rinishi kerak
+```
+
+**4. Backendni qayta ishga tushiring:**
+```bash
+systemctl restart sima-backend
+```
+
+**Smoke test:**
+```bash
+# Haqiqiy try-on — 200 + WebP rasm qaytishi kerak:
+curl -s -o /dev/null -w "%{http_code}" \
+  -H "X-Api-Key: <kalit>" \
+  -H "Content-Type: application/json" \
+  -d '{"person_image":"...","cloth_image":"...","cloth_type":"upper"}' \
+  https://trysima.uz/api/tryon
+
+# Modal URL'iga to'g'ridan-to'g'ri (imzosiz) — 403 qaytishi kerak:
+curl -s -o /dev/null -w "%{http_code}" \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"person_image":"","cloth_image":"","cloth_type":"upper"}' \
+  https://<workspace>--catvton-tryon-tryon-api.modal.run
+# → 403
+```
+
 ## Keyingi bosqichlar (backend dev uchun)
 
 - ✅ Imzolangan token (HMAC + nonce) qo'shildi.
