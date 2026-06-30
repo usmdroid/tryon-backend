@@ -149,6 +149,34 @@ class AuthTest {
     }
 
     @Test
+    void eski_sessiya_token_SUSPENDEDdan_keyin_401() throws Exception {
+        String phone = "+998901110098";
+        String email = "block-token@dokon.uz";
+        sendOtp(email);
+        // Login va token oladi.
+        String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(json("name", "A", "phone", phone, "email", email, "password", "parol123", "code", OTP)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String token = mapper.readTree(body).get("token").asText();
+
+        // Token bilan istalgan kabinet endpoint'i ishlaydi (200).
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/api-keys").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        // Admin bloklaydi.
+        Client c = clients.findByPhone(Phones.normalize(phone)).orElseThrow();
+        c.setStatus("SUSPENDED");
+        clients.save(c);
+
+        // Endi xuddi shu token bilan endpoint 401 (yoki shunga o'xshash) qaytaradi.
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/api-keys").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void login_bloklangan_akkaunt_403_SUSPENDED() throws Exception {
         String phone = "+998901110099";
         String email = "blocked@dokon.uz";
