@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import uz.tryon.api.util.BearerExtractor;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +55,6 @@ public class ApiKeyController {
             m.put("createdAt", k.getCreatedAt());
             m.put("lastUsedAt", k.getLastUsedAt());
             m.put("revokedAt", k.getRevokedAt());
-            // Connect oqimi uchun: keyEnc mavjud va bekor qilinmagan kalitlar tanlanishi mumkin
             m.put("revealable", k.getRevokedAt() == null && k.getKeyEnc() != null);
             return m;
         }).toList();
@@ -96,9 +97,7 @@ public class ApiKeyController {
     }
 
     private Optional<String> authenticate(HttpServletRequest req) {
-        String header = req.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) return Optional.empty();
-        return authService.verifySessionToken(header.substring(7));
+        return BearerExtractor.extract(req).flatMap(authService::verifySessionToken);
     }
 
     private ResponseEntity<Map<String, String>> unauthorized() {

@@ -5,18 +5,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import uz.tryon.api.util.AuthHashUtils;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.HexFormat;
 import java.util.Map;
 
 /**
@@ -25,9 +21,6 @@ import java.util.Map;
  * Backend Modal'ni HMAC-SHA256 imzolangan so'rov bilan chaqiradi.
  * Imzo: HMAC_SHA256(secret, timestamp + "." + body), hex string.
  * Modal URL va secret faqat shu yerda (env'dan) — hech qachon frontendga chiqmaydi.
- *
- * Modal JSON qabul qiladi: { person_image, cloth_image, cloth_type }
- * va WebP rasm (bytes) qaytaradi.
  */
 @Service
 public class ModalClient {
@@ -67,7 +60,7 @@ public class ModalClient {
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(config.getModalUrl()))
-                    .timeout(Duration.ofSeconds(120))   // generatsiya ~17s, cold start ehtimoli uchun zaxira
+                    .timeout(Duration.ofSeconds(120))
                     .header("Content-Type", "application/json")
                     .header("X-Sima-Timestamp", Long.toString(timestamp))
                     .header("X-Sima-Signature", signature)
@@ -100,13 +93,6 @@ public class ModalClient {
      *   msg = timestamp_string.getBytes(UTF-8) + ".".getBytes(UTF-8) + body.getBytes(UTF-8)
      */
     static String hmacSha256Hex(String secret, String message) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] sig = mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(sig);
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            throw new RuntimeException("HmacSHA256 unavailable", e);
-        }
+        return AuthHashUtils.hmacSha256Hex(secret, message);
     }
 }

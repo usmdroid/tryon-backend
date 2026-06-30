@@ -13,11 +13,10 @@ import uz.tryon.api.auth.ApiKey;
 import uz.tryon.api.auth.ApiKeyRepository;
 import uz.tryon.api.auth.ApiKeyService;
 import uz.tryon.api.auth.AuthService;
+import uz.tryon.api.util.AuthHashUtils;
+import uz.tryon.api.util.BearerExtractor;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
@@ -61,13 +60,11 @@ public class ConnectController {
      */
     @PostMapping("/authorize")
     public ResponseEntity<?> authorize(@RequestBody AuthorizeRequest req, HttpServletRequest request) {
-        // Session token tekshirish
         Optional<String> clientIdOpt = authenticate(request);
         if (clientIdOpt.isEmpty()) return unauthorized();
 
         UUID clientId = UUID.fromString(clientIdOpt.get());
 
-        // apiKeyId majburiy
         if (req.apiKeyId() == null || req.apiKeyId().isBlank()) {
             return err(HttpStatus.BAD_REQUEST, "apiKeyId majburiy.");
         }
@@ -78,19 +75,17 @@ public class ConnectController {
             return err(HttpStatus.BAD_REQUEST, "apiKeyId noto'g'ri format.");
         }
 
-        // Kalit mavjud va foydalanuvchiga tegishlimi?
         Optional<ApiKey> keyOpt = apiKeyRepo.findByIdAndClientId(apiKeyId, clientId);
         if (keyOpt.isEmpty()) {
             return err(HttpStatus.NOT_FOUND, "API kalit topilmadi.");
         }
         ApiKey apiKey = keyOpt.get();
 
-        // Bekor qilingan yoki eski kalit (keyEnc=null) bo'lsa tanlab bo'lmaydi
+        // Bekor qilingan yoki eski kalit (keyEnc=null) — tanlab bo'lmaydi.
         if (apiKey.getRevokedAt() != null || apiKey.getKeyEnc() == null) {
             return err(HttpStatus.BAD_REQUEST, "Bu kalitni ulab bo'lmaydi.");
         }
 
-        // redirect_uri tekshirish: https (yoki localhost http)
         if (req.redirectUri() == null || req.redirectUri().isBlank()) {
             return err(HttpStatus.BAD_REQUEST, "redirectUri majburiy.");
         }
@@ -98,11 +93,10 @@ public class ConnectController {
             return err(HttpStatus.BAD_REQUEST, "redirectUri https bilan boshlanishi shart (localhost bundan mustasno).");
         }
 
-        // Bir martalik kodni yaratib saqlaymiz (hash ko'rinishida)
         byte[] randomBytes = new byte[32];
         new SecureRandom().nextBytes(randomBytes);
         String code = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-        String codeHash = sha256hex(code);
+        String codeHash = AuthHashUtils.hex(AuthHashUtils.sha256(code));
         Instant expiresAt = Instant.now().plusSeconds(CODE_TTL_SECONDS);
 
         connectCodeRepo.save(new ConnectCode(codeHash, clientId, apiKeyId, req.redirectUri(), expiresAt));
@@ -121,27 +115,25 @@ public class ConnectController {
             return err(HttpStatus.BAD_REQUEST, "Kod noto'g'ri yoki muddati o'tgan.");
         }
 
-        String codeHash = sha256hex(req.code());
+        String codeHash = AuthHashUtils.hex(AuthHashUtils.sha256(req.code()));
 
-        // Kodni topamiz
         Optional<ConnectCode> recordOpt = connectCodeRepo.findByCodeHash(codeHash);
         if (recordOpt.isEmpty()) {
             return err(HttpStatus.BAD_REQUEST, "Kod noto'g'ri yoki muddati o'tgan.");
         }
         ConnectCode record = recordOpt.get();
 
-        // TTL tekshirish
         if (Instant.now().isAfter(record.getExpiresAt())) {
             return err(HttpStatus.BAD_REQUEST, "Kod noto'g'ri yoki muddati o'tgan.");
         }
 
-        // Atomik consume (bir martalik): 0 qaytarsa — allaqachon ishlatilgan
+        // Atomik consume (bir martalik): 0 qaytarsa — allaqachon ishlatilgan.
         int updated = connectCodeRepo.consumeByHash(codeHash, Instant.now());
         if (updated == 0) {
             return err(HttpStatus.BAD_REQUEST, "Kod noto'g'ri yoki muddati o'tgan.");
         }
 
-        // Kalitni ochib qaytaramiz (faqat server-server!)
+        // Kalitni ochib qaytaramiz (faqat server-server!).
         Optional<ApiKey> keyOpt = apiKeyRepo.findById(record.getApiKeyId());
         if (keyOpt.isEmpty()) {
             return err(HttpStatus.BAD_REQUEST, "Kalit topilmadi.");
@@ -154,11 +146,8 @@ public class ConnectController {
         return ResponseEntity.ok(Map.of("key", secret));
     }
 
-    /** Bearer token'dan clientId oladi. */
     private Optional<String> authenticate(HttpServletRequest req) {
-        String header = req.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) return Optional.empty();
-        return authService.verifySessionToken(header.substring(7));
+        return BearerExtractor.extract(req).flatMap(authService::verifySessionToken);
     }
 
     /**
@@ -189,17 +178,5 @@ public class ConnectController {
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("error", message));
-    }
-
-    private static String sha256hex(String input) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder(64);
-            for (byte b : hash) sb.append(String.format("%02x", b));
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

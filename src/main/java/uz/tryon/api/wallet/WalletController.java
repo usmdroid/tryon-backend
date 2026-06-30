@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uz.tryon.api.auth.AuthService;
+import uz.tryon.api.util.BearerExtractor;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -94,9 +95,7 @@ public class WalletController {
     }
 
     private Optional<String> authenticate(HttpServletRequest req) {
-        String header = req.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) return Optional.empty();
-        return authService.verifySessionToken(header.substring(7));
+        return BearerExtractor.extract(req).flatMap(authService::verifySessionToken);
     }
 
     private ResponseEntity<Map<String, String>> unauthorized() {

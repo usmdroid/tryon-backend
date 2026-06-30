@@ -2,7 +2,6 @@ package uz.tryon.api.admin;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,8 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 import uz.tryon.api.auth.Client;
 import uz.tryon.api.auth.ClientRepository;
 import uz.tryon.api.auth.OtpService;
+import uz.tryon.api.util.ApiErrors;
 import uz.tryon.api.wallet.CreditService;
-import uz.tryon.api.wallet.CreditTransaction;
 import uz.tryon.api.wallet.CreditTransactionRepository;
 import uz.tryon.api.wallet.Wallet;
 import uz.tryon.api.wallet.WalletRepository;
@@ -24,15 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Super-admin paneli API'si (/api/admin/*).
- * Har bir endpoint avval requireSuperAdmin() ni chaqiradi:
- *   token yo'q/yaroqsiz -> 401, super-admin emas -> 403.
- * Auth: Authorization: Bearer <session-token>.
- *
- * Keyingi bosqich (HOZIR EMAS): admin uchun 2FA + IP allowlist + alohida subdomain.
- * Hozircha RBAC + tenant izolyatsiya to'g'ri qilingan, keyin subdomain'ga ajratish oson bo'lsin.
+ * Token yo'q/yaroqsiz -> 401, super-admin emas -> 403.
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -68,8 +63,13 @@ public class AdminController {
     public ResponseEntity<?> listClients(HttpServletRequest request) {
         access.requireStaff(request);
 
-        List<Map<String, Object>> result = clients.findAllByOrderByCreatedAtDesc().stream().map(c -> {
-            Wallet w = wallets.findById(c.getId()).orElse(null);
+        List<Client> allClients = clients.findAllByOrderByCreatedAtDesc();
+        Map<UUID, Wallet> walletById = wallets.findAllById(
+                allClients.stream().map(Client::getId).toList()
+        ).stream().collect(Collectors.toMap(Wallet::getClientId, w -> w));
+
+        List<Map<String, Object>> result = allClients.stream().map(c -> {
+            Wallet w = walletById.get(c.getId());
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", c.getId());
             m.put("name", c.getName());
@@ -132,7 +132,7 @@ public class AdminController {
 
         if (clients.findById(id).isEmpty()) return notFound();
         if (req.amountSim() <= 0) {
-            return err(HttpStatus.BAD_REQUEST, "amountSim musbat bo'lishi kerak.");
+            return ApiErrors.err(HttpStatus.BAD_REQUEST, "amountSim musbat bo'lishi kerak.");
         }
 
         Wallet w = creditService.adminCreditSim(id, req.amountSim());
@@ -158,7 +158,6 @@ public class AdminController {
     /**
      * Mijoz rolini o'zgartirish (CLIENT yoki MODERATOR). Faqat super-admin.
      * Super-adminni UI orqali tayinlash/bekor qilish mumkin emas.
-     * 400 — yaroqsiz rol yoki nishon super-admin. 404 — mijoz topilmasa.
      */
     @PostMapping("/clients/{id}/role")
     public ResponseEntity<?> setRole(@PathVariable UUID id, @RequestBody RoleRequest req,
@@ -166,17 +165,17 @@ public class AdminController {
         access.requireSuperAdmin(request);
 
         if (req == null || req.role() == null) {
-            return err(HttpStatus.BAD_REQUEST, "Rol kiritilishi shart.");
+            return ApiErrors.err(HttpStatus.BAD_REQUEST, "Rol kiritilishi shart.");
         }
         String role = req.role().trim().toUpperCase();
         if (!role.equals("CLIENT") && !role.equals("MODERATOR")) {
-            return err(HttpStatus.BAD_REQUEST, "Faqat CLIENT yoki MODERATOR rolini berish mumkin.");
+            return ApiErrors.err(HttpStatus.BAD_REQUEST, "Faqat CLIENT yoki MODERATOR rolini berish mumkin.");
         }
 
         Optional<Client> opt = clients.findById(id);
         if (opt.isEmpty()) return notFound();
         if ("SUPER_ADMIN".equals(opt.get().getRole())) {
-            return err(HttpStatus.BAD_REQUEST, "Super-admin rolini UI orqali o'zgartirib bo'lmaydi.");
+            return ApiErrors.err(HttpStatus.BAD_REQUEST, "Super-admin rolini UI orqali o'zgartirib bo'lmaydi.");
         }
 
         adminService.setRole(id, role);
@@ -195,24 +194,18 @@ public class AdminController {
         return ResponseEntity.ok(body);
     }
 
-    /** OTP suiiste'mol blokini bekor qilish — blok + breach + eskalatsiya darajasini tozalaydi. Xodim (moderator/super-admin). */
+    /** OTP suiiste'mol blokini bekor qilish. Xodim (moderator/super-admin). */
     @PostMapping("/otp/unblock")
     public ResponseEntity<?> unblockOtp(@RequestBody UnblockOtpRequest req, HttpServletRequest request) {
         access.requireStaff(request);
         if (req == null || req.email() == null || req.email().isBlank()) {
-            return err(HttpStatus.BAD_REQUEST, "Email kiritilishi shart.");
+            return ApiErrors.err(HttpStatus.BAD_REQUEST, "Email kiritilishi shart.");
         }
         otpService.unblock(req.email());
         return ResponseEntity.ok(Map.of("message", "OTP bloki bekor qilindi."));
     }
 
     private ResponseEntity<Map<String, String>> notFound() {
-        return err(HttpStatus.NOT_FOUND, "Mijoz topilmadi.");
-    }
-
-    private ResponseEntity<Map<String, String>> err(HttpStatus status, String message) {
-        return ResponseEntity.status(status)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("error", message));
+        return ApiErrors.err(HttpStatus.NOT_FOUND, "Mijoz topilmadi.");
     }
 }

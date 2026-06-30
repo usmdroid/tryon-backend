@@ -7,8 +7,8 @@ import org.springframework.web.server.ResponseStatusException;
 import uz.tryon.api.auth.AuthService;
 import uz.tryon.api.auth.Client;
 import uz.tryon.api.auth.ClientRepository;
+import uz.tryon.api.util.BearerExtractor;
 
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -25,6 +25,8 @@ public class AdminAccessService {
 
     public static final String ROLE_SUPER_ADMIN = "SUPER_ADMIN";
     public static final String ROLE_MODERATOR = "MODERATOR";
+
+    private static final String UNAUTHORIZED_MSG = "Sessiya tokeni xato yoki muddati o'tgan.";
 
     private final AuthService authService;
     private final ClientRepository clients;
@@ -65,25 +67,21 @@ public class AdminAccessService {
      * @throws ResponseStatusException 401 — token yo'q/yaroqsiz yoki mijoz topilmadi.
      */
     private Client authenticate(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessiya tokeni xato yoki muddati o'tgan.");
-        }
-        Optional<String> clientIdOpt = authService.verifySessionToken(header.substring(7));
-        if (clientIdOpt.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessiya tokeni xato yoki muddati o'tgan.");
-        }
+        String token = BearerExtractor.extract(request)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, UNAUTHORIZED_MSG));
+
+        String clientIdStr = authService.verifySessionToken(token)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, UNAUTHORIZED_MSG));
 
         UUID clientId;
         try {
-            clientId = UUID.fromString(clientIdOpt.get());
+            clientId = UUID.fromString(clientIdStr);
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessiya tokeni xato yoki muddati o'tgan.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, UNAUTHORIZED_MSG);
         }
 
         // Rol DB dan o'qiladi — token ichidagi ma'lumotga tayanmaymiz.
         return clients.findById(clientId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-                        "Sessiya tokeni xato yoki muddati o'tgan."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, UNAUTHORIZED_MSG));
     }
 }

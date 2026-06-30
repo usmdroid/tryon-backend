@@ -1,9 +1,8 @@
 server:
   port: ${PORT:8080}
-  # Tomcat thread/connection cheklash — xotira tejash (kam yuk uchun).
   tomcat:
     threads:
-      max: ${TRYON_TOMCAT_THREADS:25}      # default 200; 25 bemalol yetadi
+      max: ${TRYON_TOMCAT_THREADS:25}
       min-spare: ${TRYON_TOMCAT_MIN_SPARE:5}
     max-connections: ${TRYON_TOMCAT_MAX_CONN:200}
     accept-count: 20
@@ -22,19 +21,16 @@ spring:
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
 
   # PostgreSQL — Railway PG* o'zgaruvchilaridan (lokalda localhost default).
-  # Railway: backend servisiga Postgres'ning PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD
-  # o'zgaruvchilarini reference qiling (yoki SPRING_DATASOURCE_URL ni bering).
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:sima}}
     username: ${PGUSER:sima}
     password: ${PGPASSWORD:sima}
-    # DB pool kichik — bitta-ikkita ulanish yetadi (kam foydalanuvchi, xotira tejash).
     hikari:
       maximum-pool-size: ${TRYON_DB_POOL_MAX:5}
       minimum-idle: 1
   jpa:
     hibernate:
-      ddl-auto: none   # sxemani to'liq Flyway boshqaradi (Hibernate o'zgartirmaydi/tekshirmaydi)
+      ddl-auto: none   # sxemani to'liq Flyway boshqaradi
     open-in-view: false
     properties:
       hibernate:
@@ -43,81 +39,68 @@ spring:
   flyway:
     enabled: true
 
-# Try-on sozlamalari — barchasi env o'zgaruvchilardan (lokalda default qiymatlar).
-# Production'da bularni platforma (Railway/Render) env sozlamalarida beriladi.
 tryon:
-  # Texnik tanaffus rejimi (xotira tejash) — true bo'lsa /session, /check, /tryon
-  # 503 qaytaradi, kirish rasm so'rovi umuman decode qilinmaydi.
-  # Auth, kabinet, monitoring, admin BARIBIR ishlaydi.
-  # Yoqish: Railway env TRYON_MAINTENANCE=true.
+  # TRYON_MAINTENANCE — true bo'lsa /session, /check, /tryon 503 qaytaradi.
   maintenance: ${TRYON_MAINTENANCE:false}
 
-  # Modal web endpoint (deploy qilingan)
+  # TRYON_MODAL_URL — Modal web endpoint.
   modal-url: ${TRYON_MODAL_URL:https://elusm17--catvton-tryon-tryon-tryon-api.modal.run}
 
-  # Modal HMAC secret — MANDATORY in prod; if empty or default the app refuses to start.
-  # Set via: TRYON_MODAL_SECRET=<same value as SIMA_MODAL_SECRET in Modal secret store>
+  # TRYON_MODAL_SECRET — Modal HMAC secret; prodda majburiy, bo'sh bo'lsa ilovа ishlamaydi.
   modal-secret: ${TRYON_MODAL_SECRET:}
 
-  # Sotuvchi API kalitlari (vergul bilan). Demo uchun bitta test kalit.
-  # Production'da DB'dan yoki ko'proq kalit.
+  # TRYON_API_KEYS — vergul bilan ajratilgan API kalitlar (legacy config kalitlar).
   api-keys: ${TRYON_API_KEYS:test-key-12345}
 
-  # Ruxsat etilgan domenlar (vergul bilan). Bo'sh = hammasiga ruxsat (demo).
+  # TRYON_ALLOWED_ORIGINS — ruxsat etilgan domenlar; bo'sh = hammasiga ruxsat.
   allowed-origins: ${TRYON_ALLOWED_ORIGINS:}
 
-  # Bir kalit uchun daqiqasiga maksimal so'rov
+  # TRYON_RATE_LIMIT — bir kalit uchun daqiqasiga maksimal so'rov soni.
   rate-limit-per-minute: ${TRYON_RATE_LIMIT:5}
 
-  # Maksimal rasm hajmi (bayt) — 8 MB
+  # TRYON_MAX_IMAGE_BYTES — maksimal rasm hajmi baytda.
   max-image-bytes: ${TRYON_MAX_IMAGE_BYTES:8388608}
 
-  # Super-admin telefoni — ishga tushganda shu telefonli mijozga SUPER_ADMIN roli beriladi.
-  # Bo'sh = hech kim super-admin qilinmaydi. Kodda telefon yozilmaydi (faqat env).
+  # TRYON_SUPER_ADMIN_PHONE — ishga tushganda shu telefonli mijozga SUPER_ADMIN roli beriladi.
   super-admin-phone: ${TRYON_SUPER_ADMIN_PHONE:${SUPER_ADMIN_PHONE:}}
 
-  # Demo seed: monitoring sahifalarini vizual tekshirish uchun demo ma'lumotlari.
-  # Faqat dev/staging uchun. Yoqish: TRYON_DEMO_SEED=true env.
+  # TRYON_DEMO_SEED — true bo'lsa monitoring sahifasi uchun demo ma'lumotlar qo'shiladi.
   demo-seed: ${TRYON_DEMO_SEED:false}
 
-  # Sessiya tokeni (HMAC imzo) — Production'da TRYON_TOKEN_SECRET ni albatta o'rnating
+  # TRYON_TOKEN_SECRET — sessiya tokeni HMAC imzo siri; prodda albatta o'rnating.
   token-secret: ${TRYON_TOKEN_SECRET:dev-secret-change-me}
   token-ttl-seconds: ${TRYON_TOKEN_TTL_SECONDS:300}
-  # API kalitlarni teskari shifrlash siri (AES) — Production'da albatta o'rnating
+  # TRYON_KEY_ENC_SECRET — API kalitlarni shifrlash siri (AES); prodda albatta o'rnating.
   key-enc-secret: ${TRYON_KEY_ENC_SECRET:dev-secret-change-me}
 
-  # OTP (email tasdiqlash).
-  # Real rejim: fixed-code BO'SH = har safar tasodifiy 6 xonali kod (Resend orqali yuboriladi).
-  # Lokal dev'da qat'iy kod kerak bo'lsa: TRYON_OTP_FIXED_CODE=123456 env bilan bering.
+  # TRYON_OTP_TTL_SECONDS — OTP kodi amal qilish muddati soniyada.
   otp-ttl-seconds: ${TRYON_OTP_TTL_SECONDS:300}
+  # TRYON_OTP_FIXED_CODE — bo'sh = tasodifiy kod; lokal dev'da qattiq kod uchun bering.
   otp-fixed-code: ${TRYON_OTP_FIXED_CODE:}
-  # Dev: kodni send-otp javobida qaytarish (frontend toast). Production'da false!
+  # TRYON_OTP_EXPOSE_CODE — true bo'lsa kodni send-otp javobida qaytaradi (faqat dev!).
   otp-expose-code: ${TRYON_OTP_EXPOSE_CODE:false}
 
-  # Email (OTP yetkazish). trysima.uz Resend'da verified — real email yuboriladi.
-  # ⚠️ resend-api-key — MAXFIY. Pastdagi "your_apikey" ni haqiqiy kalit (re_...) bilan almashtiring.
-  #    Eslatma: bu fayl git'ga tushadi — kalitni shu yerga yozsangiz push qilmang
-  #    (yoki yaxshisi Railway env RESEND_API_KEY bilan bering — u shu default'ni bekor qiladi).
+  # MAIL_PROVIDER — email provayder (resend).
   mail-provider: ${MAIL_PROVIDER:resend}
+  # MAIL_FROM — yuboruvchi email manzil.
   mail-from: ${MAIL_FROM:noreply@trysima.uz}
+  # RESEND_API_KEY — Resend API kaliti; prodda Railway env orqali bering.
   resend-api-key: ${RESEND_API_KEY:your_apikey}
 
-  # Redis (rate limit uchun). Bo'sh = xotirada ishlaydi (lokal/test uchun).
+  # REDIS_URL — rate limit uchun Redis; bo'sh = xotirada ishlaydi.
   redis-url: ${REDIS_URL:}
 
-  # R2 saqlash (faqat natija rasmi, kirish rasmlari saqlanmaydi — maxfiylik).
-  # Bo'sh = saqlash o'chiq (lokal/test uchun).
+  # R2_ENDPOINT/R2_BUCKET/R2_ACCESS_KEY/R2_SECRET_KEY — natija rasmlari uchun R2 saqlash.
   r2-endpoint: ${R2_ENDPOINT:}
   r2-bucket: ${R2_BUCKET:}
   r2-access-key: ${R2_ACCESS_KEY:}
   r2-secret-key: ${R2_SECRET_KEY:}
 
-  # ML detektorlar — default O'CHIQ (xotira tejash). Try-on ustida ishlaganda yoqing:
-  #   TRYON_YOLO_ENABLED=true va TRYON_POSE_ENABLED=true
+  # TRYON_YOLO_ENABLED / TRYON_POSE_ENABLED — ML detektorlar; default o'chiq.
   yolo-enabled: ${TRYON_YOLO_ENABLED:false}
   pose-enabled: ${TRYON_POSE_ENABLED:false}
 
-  # Rasm sifati tekshiruvi (POST /api/check) chegaralari
+  # Rasm sifati tekshiruvi (POST /api/check) chegaralari.
   check:
     min-width: ${TRYON_CHECK_MIN_WIDTH:256}
     min-height: ${TRYON_CHECK_MIN_HEIGHT:256}

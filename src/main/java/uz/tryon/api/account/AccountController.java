@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import uz.tryon.api.auth.AuthService;
 import uz.tryon.api.auth.OtpService;
+import uz.tryon.api.util.BearerExtractor;
 
 import java.util.Map;
 import java.util.Optional;
@@ -196,9 +197,7 @@ public class AccountController {
     }
 
     private Optional<String> authenticate(HttpServletRequest req) {
-        String header = req.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) return Optional.empty();
-        return authService.verifySessionToken(header.substring(7));
+        return BearerExtractor.extract(req).flatMap(authService::verifySessionToken);
     }
 
     private ResponseEntity<Map<String, String>> unauthorized() {

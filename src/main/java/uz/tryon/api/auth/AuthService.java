@@ -4,12 +4,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import uz.tryon.api.AppConfig;
+import uz.tryon.api.util.AuthHashUtils;
 import uz.tryon.api.wallet.CreditService;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.Optional;
 
@@ -23,7 +21,7 @@ import java.util.Optional;
 @Service
 public class AuthService {
 
-    private static final long SESSION_TTL_MS = 7L * 24 * 60 * 60 * 1000; // 7 kun
+    private static final long SESSION_TTL_MS = 7L * 24 * 60 * 60 * 1000;
 
     private final ClientRepository clients;
     private final AppConfig config;
@@ -47,7 +45,6 @@ public class AuthService {
         if (clients.existsByPhone(normPhone)) {
             throw new PhoneAlreadyExistsException();
         }
-        // Email har doim mavjud bo'ladi; mudofaa uchun bo'shni hamon null deb qoldiramiz.
         String normEmail = (email == null || email.isBlank()) ? null : email.trim().toLowerCase();
         if (normEmail != null && clients.existsByEmail(normEmail)) {
             throw new EmailAlreadyExistsException();
@@ -75,7 +72,8 @@ public class AuthService {
     public String issueSessionToken(Client c) {
         long exp = System.currentTimeMillis() + SESSION_TTL_MS;
         String payload = c.getId() + "|" + exp;
-        return b64(payload.getBytes(StandardCharsets.UTF_8)) + "." + b64(hmac(payload));
+        return AuthHashUtils.b64Url(payload.getBytes(StandardCharsets.UTF_8))
+                + "." + AuthHashUtils.b64Url(AuthHashUtils.hmacSha256(config.getTokenSecret(), payload));
     }
 
     /**
@@ -93,7 +91,11 @@ public class AuthService {
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
-        if (!constantTimeEquals(token.substring(dot + 1), b64(hmac(payload)))) return Optional.empty();
+        if (!AuthHashUtils.constantTimeEquals(
+                token.substring(dot + 1),
+                AuthHashUtils.b64Url(AuthHashUtils.hmacSha256(config.getTokenSecret(), payload)))) {
+            return Optional.empty();
+        }
         String[] f = payload.split("\\|", -1);
         if (f.length != 2) return Optional.empty();
         try {
@@ -102,23 +104,5 @@ public class AuthService {
             return Optional.empty();
         }
         return Optional.of(f[0]);
-    }
-
-    private byte[] hmac(String data) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(config.getTokenSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
-            throw new IllegalStateException("HMAC xatosi", e);
-        }
-    }
-
-    private static String b64(byte[] b) {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
-    }
-
-    private static boolean constantTimeEquals(String a, String b) {
-        return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 }

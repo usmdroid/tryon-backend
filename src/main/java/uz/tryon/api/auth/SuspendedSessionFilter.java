@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import uz.tryon.api.util.BearerExtractor;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -35,9 +36,9 @@ public class SuspendedSessionFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
-        String header = req.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            Optional<String> clientIdOpt = authService.verifySessionToken(header.substring(7));
+        Optional<String> tokenOpt = BearerExtractor.extract(req);
+        if (tokenOpt.isPresent()) {
+            Optional<String> clientIdOpt = authService.verifySessionToken(tokenOpt.get());
             if (clientIdOpt.isPresent()) {
                 try {
                     UUID id = UUID.fromString(clientIdOpt.get());
