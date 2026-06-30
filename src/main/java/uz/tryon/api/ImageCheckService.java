@@ -225,15 +225,21 @@ public class ImageCheckService {
             return CheckItem.fail("pose", "Poza",
                     "Odam tik turmagan (yotgan yoki kuchli egilgan) ko'rinadi.");
         }
-        // Yo'nalish (old/yon/orqa) — yuz nuqtalari bo'yicha:
-        // - Front: burun + kamida 1 ko'z ko'rinadi
-        // - Back:  burun ko'rinmaydi, lekin yelkalar (yoki quloqlar) ko'rinadi
-        // CatVTON faqat oldindan turgan rasmga to'g'ri ishlaydi — orqani fail qilamiz,
-        // chunki bizda kiyimning orqa rasmi yo'q (oldi orqaga yopishib chiqadi).
-        boolean noseSeen = kp[NOSE].visible(k);
-        boolean anyEye = kp[L_EYE].visible(k) || kp[R_EYE].visible(k);
-        boolean faceSeen = noseSeen && anyEye;
-        if (!faceSeen && shoulders == 2) {
+        // ── Yo'nalish (front/side/back) ─────────────────────────────────────
+        // CatVTON faqat oldindan turgan rasmga to'g'ri ishlaydi — bizda kiyimning
+        // orqa rasmi yo'q, shuning uchun orqa yoki noaniq holatda /tryon'ga ruxsat
+        // bermaymiz (GPU vaqti behuda sarflanmasin).
+        //
+        // MoveNet ozgina o'girilgan boshdan burunni past confidence bilan ushlashi
+        // mumkin (visible-flag yetmaydi). Shuning uchun yig'indi yuz signaliga
+        // qaraymiz: nose + L_EYE + R_EYE score'lar yig'indisi.
+        //   < 0.5  : yuz deyarli umuman ko'rinmaydi → orqa/noaniq → FAIL
+        //   < 1.0  : juda zaif (yon yoki yarim-orqa) → WARN
+        //   ≥ 1.0  : front yetarli (PASS yo'liga o'tadi)
+        // Sof yon: faqat 1 yelka ko'rinadi → alohida WARN (mavjud).
+        double faceTotal = kp[NOSE].score() + kp[L_EYE].score() + kp[R_EYE].score();
+
+        if (shoulders == 2 && faceTotal < 0.5) {
             return CheckItem.fail("pose", "Poza",
                     "Orqasi bilan turgan ko'rinadi. Kiyimni to'g'ri sinash uchun old tomondan turing.");
         }
@@ -241,9 +247,9 @@ public class ImageCheckService {
             return CheckItem.warn("pose", "Poza",
                     "Yon tomondan turgan ko'rinadi. Old tomondan turish tavsiya etiladi.");
         }
-        if (!faceSeen) {
+        if (faceTotal < 1.0) {
             return CheckItem.warn("pose", "Poza",
-                    "Yuz aniq ko'rinmadi. Old tomondan va yorug' joyda turing.");
+                    "Yuz aniq ko'rinmadi (yon yoki yarim-orqa). Old tomondan va yorug' joyda turing.");
         }
         return CheckItem.pass("pose", "Poza", "Poza yaroqli (tik va old tomondan).");
     }
