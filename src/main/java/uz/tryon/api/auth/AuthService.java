@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Hamkor akkauntlari: ro'yxatdan o'tish / kirish + dashboard sessiya tokeni.
@@ -81,9 +80,8 @@ public class AuthService {
 
     /**
      * Tokenni tekshiradi; yaroqli bo'lsa clientId (UUID matni) qaytadi.
-     * Akkaunt status != ACTIVE (SUSPENDED) bo'lsa, token kriptografik yaroqli bo'lsa ham
-     * empty qaytariladi — admin tomonidan bloklangan foydalanuvchi eski sessiyasi bilan
-     * davom ettira olmasligi uchun (DB'dan har so'rovda tekshiriladi).
+     * SUSPENDED tekshiruvi alohida SuspendedSessionFilter'da (403 + code:"SUSPENDED").
+     * Bu yerda — faqat kriptografik token validligi.
      */
     public Optional<String> verifySessionToken(String token) {
         if (token == null) return Optional.empty();
@@ -103,19 +101,7 @@ public class AuthService {
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
-        String clientId = f[0];
-        // Status tekshiruvi — admin bloklasa, sessiya darhol o'lik bo'ladi.
-        try {
-            UUID uuid = UUID.fromString(clientId);
-            if (!clients.findById(uuid)
-                    .map(c -> "ACTIVE".equals(c.getStatus()))
-                    .orElse(false)) {
-                return Optional.empty();
-            }
-        } catch (IllegalArgumentException e) {
-            return Optional.empty();
-        }
-        return Optional.of(clientId);
+        return Optional.of(f[0]);
     }
 
     private byte[] hmac(String data) {

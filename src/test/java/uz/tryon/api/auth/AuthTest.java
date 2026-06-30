@@ -149,7 +149,7 @@ class AuthTest {
     }
 
     @Test
-    void eski_sessiya_token_SUSPENDEDdan_keyin_401() throws Exception {
+    void eski_sessiya_token_SUSPENDEDdan_keyin_403_SUSPENDED() throws Exception {
         String phone = "+998901110098";
         String email = "block-token@dokon.uz";
         sendOtp(email);
@@ -170,10 +170,11 @@ class AuthTest {
         c.setStatus("SUSPENDED");
         clients.save(c);
 
-        // Endi xuddi shu token bilan endpoint 401 (yoki shunga o'xshash) qaytaradi.
+        // Endi xuddi shu token bilan endpoint 403 + code:SUSPENDED qaytaradi.
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/api/api-keys").header("Authorization", "Bearer " + token))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SUSPENDED"));
     }
 
     @Test
