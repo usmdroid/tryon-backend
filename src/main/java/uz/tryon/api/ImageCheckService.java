@@ -225,9 +225,25 @@ public class ImageCheckService {
             return CheckItem.fail("pose", "Poza",
                     "Odam tik turmagan (yotgan yoki kuchli egilgan) ko'rinadi.");
         }
+        // Yo'nalish (old/yon/orqa) — yuz nuqtalari bo'yicha:
+        // - Front: burun + kamida 1 ko'z ko'rinadi
+        // - Back:  burun ko'rinmaydi, lekin yelkalar (yoki quloqlar) ko'rinadi
+        // CatVTON faqat oldindan turgan rasmga to'g'ri ishlaydi — orqani fail qilamiz,
+        // chunki bizda kiyimning orqa rasmi yo'q (oldi orqaga yopishib chiqadi).
+        boolean noseSeen = kp[NOSE].visible(k);
+        boolean anyEye = kp[L_EYE].visible(k) || kp[R_EYE].visible(k);
+        boolean faceSeen = noseSeen && anyEye;
+        if (!faceSeen && shoulders == 2) {
+            return CheckItem.fail("pose", "Poza",
+                    "Orqasi bilan turgan ko'rinadi. Kiyimni to'g'ri sinash uchun old tomondan turing.");
+        }
         if (shoulders == 1) {
             return CheckItem.warn("pose", "Poza",
                     "Yon tomondan turgan ko'rinadi. Old tomondan turish tavsiya etiladi.");
+        }
+        if (!faceSeen) {
+            return CheckItem.warn("pose", "Poza",
+                    "Yuz aniq ko'rinmadi. Old tomondan va yorug' joyda turing.");
         }
         return CheckItem.pass("pose", "Poza", "Poza yaroqli (tik va old tomondan).");
     }
