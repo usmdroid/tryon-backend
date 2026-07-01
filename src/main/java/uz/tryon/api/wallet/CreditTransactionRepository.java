@@ -26,6 +26,32 @@ public interface CreditTransactionRepository extends JpaRepository<CreditTransac
             + "WHERE t.clientId = :clientId AND t.type = 'TRYON_DEBIT'")
     long sumDebitMsim(@Param("clientId") UUID clientId);
 
+    // ---- Partner self-stats: vaqt chegarasi bilan (oxirgi 30 kun) ----
+
+    /** Mijozning TRYON_DEBIT qatorlari soni bir vaqt chegarasidan beri. */
+    @Query("SELECT COUNT(t) FROM CreditTransaction t WHERE t.clientId = :clientId AND t.type = 'TRYON_DEBIT' AND t.createdAt >= :since")
+    long countDebitsSince(@Param("clientId") UUID clientId, @Param("since") Instant since);
+
+    /** Mijozning muvaffaqiyatsiz TRYON_DEBIT soni (meta bo'sh emas = xato). */
+    @Query("SELECT COUNT(t) FROM CreditTransaction t WHERE t.clientId = :clientId AND t.type = 'TRYON_DEBIT' AND t.createdAt >= :since AND t.meta IS NOT NULL AND LENGTH(t.meta) > 0")
+    long countFailedDebitsSince(@Param("clientId") UUID clientId, @Param("since") Instant since);
+
+    /** Mijozning TRYON_DEBIT bo'yicha jami sarfi (msim) bir vaqt chegarasidan beri. */
+    @Query("SELECT COALESCE(SUM(ABS(t.amountMsim)), 0) FROM CreditTransaction t WHERE t.clientId = :clientId AND t.type = 'TRYON_DEBIT' AND t.createdAt >= :since")
+    long sumDebitMsimSince(@Param("clientId") UUID clientId, @Param("since") Instant since);
+
+    /** API kalit bo'yicha TRYON_DEBIT agregati bir vaqt chegarasidan beri (eng ko'p so'rovli kalitlar). */
+    @Query("SELECT t.apiKeyId AS apiKeyId, COUNT(t) AS requests, COALESCE(SUM(ABS(t.amountMsim)), 0) AS spentMsim "
+            + "FROM CreditTransaction t "
+            + "WHERE t.clientId = :clientId AND t.type = 'TRYON_DEBIT' AND t.createdAt >= :since AND t.apiKeyId IS NOT NULL "
+            + "GROUP BY t.apiKeyId "
+            + "ORDER BY COUNT(t) DESC")
+    List<KeyUsageRow> aggregateDebitByKeySince(@Param("clientId") UUID clientId, @Param("since") Instant since);
+
+    /** Mijozning oxirgi N ta TRYON_DEBIT qatorlari (sahifalash uchun Pageable). */
+    @Query("SELECT t FROM CreditTransaction t WHERE t.clientId = :clientId AND t.type = 'TRYON_DEBIT' ORDER BY t.createdAt DESC")
+    List<CreditTransaction> findRecentTryonDebits(@Param("clientId") UUID clientId, org.springframework.data.domain.Pageable pageable);
+
     // ---- Admin (super-admin) agregatlari — barcha mijozlar bo'yicha ----
 
     /** Barcha mijozlar bo'yicha TRYON_DEBIT qatorlari soni (admin statistikasi). */

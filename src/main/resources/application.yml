@@ -109,6 +109,9 @@ tryon:
     brightness-max: ${TRYON_CHECK_BRIGHTNESS_MAX:235}
     person-score-min: ${TRYON_CHECK_PERSON_SCORE_MIN:0.25}
     keypoint-score-min: ${TRYON_CHECK_KEYPOINT_SCORE_MIN:0.30}
+    face-ear-ratio-min: ${TRYON_CHECK_FACE_EAR_RATIO_MIN:0.5}
+    eye-strong-threshold: ${TRYON_CHECK_EYE_STRONG:0.4}
+    nose-strong-threshold: ${TRYON_CHECK_NOSE_STRONG:0.3}
 
 logging:
   level:

@@ -1,14 +1,13 @@
 package uz.tryon.api;
 
 import org.springframework.stereotype.Service;
+import uz.tryon.api.nonce.NonceStore;
 import uz.tryon.api.util.AuthHashUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Sessiya tokeni — do'kon serveri {@code /api/session} orqali oladi, brauzer esa
@@ -19,17 +18,18 @@ import java.util.concurrent.ConcurrentHashMap;
  *   payload = clientId | expEpochMs | nonce | apiKeyId (ixtiyoriy)
  *   clientId = apiKey'ning xeshi (secret kalit token ichiga tushmaydi).
  *
- * Ishlatilgan nonce'lar xotirada saqlanadi (bitta server uchun).
+ * Ishlatilgan nonce'lar NonceStore orqali saqlanadi (in-memory yoki Redis).
  */
 @Service
 public class TokenService {
 
     private final AppConfig config;
+    private final NonceStore nonceStore;
     private final SecureRandom random = new SecureRandom();
-    private final Map<String, Long> usedNonces = new ConcurrentHashMap<>();
 
-    public TokenService(AppConfig config) {
+    public TokenService(AppConfig config, NonceStore nonceStore) {
         this.config = config;
+        this.nonceStore = nonceStore;
     }
 
     public record Issued(String token, long expiresInSeconds) {}
@@ -99,9 +99,8 @@ public class TokenService {
 
         long now = System.currentTimeMillis();
         if (now > exp) return Optional.empty();
-        purgeExpired(now);
 
-        if (consume && usedNonces.putIfAbsent(nonce, exp) != null) {
+        if (consume && !nonceStore.tryConsume(nonce, exp)) {
             return Optional.empty();
         }
         return Optional.of(new Verified(clientId, apiKeyId));
@@ -116,11 +115,5 @@ public class TokenService {
         byte[] b = new byte[12];
         random.nextBytes(b);
         return AuthHashUtils.b64Url(b);
-    }
-
-    private void purgeExpired(long now) {
-        if (usedNonces.size() > 10_000) { // oddiy himoya
-            usedNonces.entrySet().removeIf(e -> e.getValue() < now);
-        }
     }
 }

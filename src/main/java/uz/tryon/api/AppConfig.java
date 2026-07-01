@@ -128,6 +128,22 @@ public class AppConfig {
 
         public double getKeypointScoreMin() { return keypointScoreMin; }
         public void setKeypointScoreMin(double v) { this.keypointScoreMin = v; }
+
+        /** Yuz/quloq nisbati minimal chegarasi — orqa aniqlash uchun. */
+        private double faceEarRatioMin = 0.5;
+        /** Ko'z kuchi chegarasi — kuchli ko'z hisoblash uchun. */
+        private double eyeStrongThreshold = 0.4;
+        /** Burun kuchi chegarasi — orqa aniqlash uchun. */
+        private double noseStrongThreshold = 0.3;
+
+        public double getFaceEarRatioMin() { return faceEarRatioMin; }
+        public void setFaceEarRatioMin(double v) { this.faceEarRatioMin = v; }
+
+        public double getEyeStrongThreshold() { return eyeStrongThreshold; }
+        public void setEyeStrongThreshold(double v) { this.eyeStrongThreshold = v; }
+
+        public double getNoseStrongThreshold() { return noseStrongThreshold; }
+        public void setNoseStrongThreshold(double v) { this.noseStrongThreshold = v; }
     }
 
     public String getModalUrl() { return modalUrl; }

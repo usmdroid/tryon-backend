@@ -202,8 +202,52 @@ public class ImageCheckService {
         checks.add(coverageCheck(subject, clothType, kmin));
     }
 
-    /** Tik turibdimi / yotmaganmi / old tomondanmi. */
-    private CheckItem poseCheck(Person p, double k) {
+    enum Facing { FRONT, SIDE, BACK, UNCERTAIN }
+
+    /**
+     * Uch signalli ovoz berish orqali yuzlanishni aniqlaydi.
+     * Package-private + static — testlarda bevosita chaqirish uchun.
+     *
+     * Signal 1 (face_vs_ear_ratio): yuz_avg / quloq_avg < faceEarRatioMin → orqa ovoz
+     * Signal 2 (strong_eyes_count): kuchli ko'z soni == 0 → orqa ovoz
+     * Signal 3 (nose_high_confidence): burun score < noseStrongThreshold → orqa ovoz
+     *
+     * votes>=2 → BACK; votes==1 → UNCERTAIN; votes==0 → FRONT
+     */
+    static Facing detectFacing(Keypoint[] kp,
+                                double faceEarRatioMin,
+                                double eyeStrongThreshold,
+                                double noseStrongThreshold) {
+        double faceAvg = (kp[NOSE].score() + kp[L_EYE].score() + kp[R_EYE].score()) / 3.0;
+        double earAvg  = (kp[L_EAR].score() + kp[R_EAR].score()) / 2.0;
+
+        int backVotes = 0;
+
+        // Signal 1: yuz/quloq nisbati
+        if (earAvg > 1e-6 && faceAvg / earAvg < faceEarRatioMin) backVotes++;
+
+        // Signal 2: kuchli ko'z soni
+        int strongEyes = 0;
+        if (kp[L_EYE].score() >= eyeStrongThreshold) strongEyes++;
+        if (kp[R_EYE].score() >= eyeStrongThreshold) strongEyes++;
+        if (strongEyes == 0) backVotes++;
+
+        // Signal 3: burun ishonchi
+        if (kp[NOSE].score() < noseStrongThreshold) backVotes++;
+
+        if (backVotes >= 2) return Facing.BACK;
+        if (backVotes == 1) return Facing.UNCERTAIN;
+        return Facing.FRONT;
+    }
+
+    private Facing detectFacing(Person p, double k) {
+        var c = config.getCheck();
+        return detectFacing(p.keypoints(),
+                c.getFaceEarRatioMin(), c.getEyeStrongThreshold(), c.getNoseStrongThreshold());
+    }
+
+    /** Tik turibdimi / yotmaganmi / old tomondanmi. Package-private — testlarda chaqirish uchun. */
+    CheckItem poseCheck(Person p, double k) {
         Keypoint[] kp = p.keypoints();
         int shoulders = (kp[L_SHOULDER].visible(k) ? 1 : 0) + (kp[R_SHOULDER].visible(k) ? 1 : 0);
         int hips = (kp[L_HIP].visible(k) ? 1 : 0) + (kp[R_HIP].visible(k) ? 1 : 0);
@@ -218,39 +262,33 @@ public class ImageCheckService {
         double hipMidY = avg(kp, L_HIP, R_HIP, k, true);
         double hipMidX = avg(kp, L_HIP, R_HIP, k, false);
 
-        double dy = hipMidY - shMidY;          // tik turganda bel yelkadan pastda (dy > 0)
+        double dy = hipMidY - shMidY;   // tik turganda bel yelkadan pastda (dy > 0)
         double dx = Math.abs(hipMidX - shMidX);
 
+        // 1. Yotgan yoki egilgan
         if (dy <= 0 || dx > dy) {
             return CheckItem.fail("pose", "Poza",
                     "Odam tik turmagan (yotgan yoki kuchli egilgan) ko'rinadi.");
         }
-        // ── Yo'nalish (front/side/back) ─────────────────────────────────────
-        // CatVTON faqat oldindan turgan rasmga to'g'ri ishlaydi — bizda kiyimning
-        // orqa rasmi yo'q, shuning uchun orqa yoki noaniq holatda /tryon'ga ruxsat
-        // bermaymiz (GPU vaqti behuda sarflanmasin).
-        //
-        // MoveNet ozgina o'girilgan boshdan burunni past confidence bilan ushlashi
-        // mumkin (visible-flag yetmaydi). Shuning uchun yig'indi yuz signaliga
-        // qaraymiz: nose + L_EYE + R_EYE score'lar yig'indisi.
-        //   < 0.5  : yuz deyarli umuman ko'rinmaydi → orqa/noaniq → FAIL
-        //   < 1.0  : juda zaif (yon yoki yarim-orqa) → WARN
-        //   ≥ 1.0  : front yetarli (PASS yo'liga o'tadi)
-        // Sof yon: faqat 1 yelka ko'rinadi → alohida WARN (mavjud).
-        double faceTotal = kp[NOSE].score() + kp[L_EYE].score() + kp[R_EYE].score();
 
-        if (shoulders == 2 && faceTotal < 0.5) {
+        // 2. Ko'p signalli orqa-yuzlanish ovoz berish
+        Facing facing = detectFacing(p, k);
+        if (facing == Facing.BACK) {
             return CheckItem.fail("pose", "Poza",
                     "Orqasi bilan turgan ko'rinadi. Kiyimni to'g'ri sinash uchun old tomondan turing.");
         }
+        if (facing == Facing.UNCERTAIN) {
+            return CheckItem.warn("pose", "Poza",
+                    "Yuz aniq ko'rinmadi (yon yoki yarim-orqa). Old tomondan va yorug' joyda turing.");
+        }
+
+        // 3. Yon tomondan (bir yelka ko'rinadi)
         if (shoulders == 1) {
             return CheckItem.warn("pose", "Poza",
                     "Yon tomondan turgan ko'rinadi. Old tomondan turish tavsiya etiladi.");
         }
-        if (faceTotal < 1.0) {
-            return CheckItem.warn("pose", "Poza",
-                    "Yuz aniq ko'rinmadi (yon yoki yarim-orqa). Old tomondan va yorug' joyda turing.");
-        }
+
+        // 4. O'tdi
         return CheckItem.pass("pose", "Poza", "Poza yaroqli (tik va old tomondan).");
     }
 

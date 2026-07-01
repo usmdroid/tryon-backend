@@ -16,6 +16,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -29,6 +30,9 @@ class CheckEndpointTest {
 
     @Autowired
     MockMvc mvc;
+
+    @Autowired
+    ImageCheckService imageCheckService;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -104,5 +108,81 @@ class CheckEndpointTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ok").value(false))
                 .andExpect(jsonPath("$.checks[?(@.id=='format')].status").value("fail"));
+    }
+
+    // ---- Poza: ko'p signalli orqa aniqlash birlik testlari ----
+
+    /** 17 ta keypoint massivini yasaydi. Barcha qiymatlar 0 dan boshlanadi. */
+    private static PoseDetector.Keypoint[] buildKp() {
+        PoseDetector.Keypoint[] kp = new PoseDetector.Keypoint[17];
+        for (int i = 0; i < 17; i++) kp[i] = new PoseDetector.Keypoint(0.5, 0.5, 0.0);
+        return kp;
+    }
+
+    /** Tik turganda yelka va bel koordinatalarini belgilaydi (yotmagan tekshiruvi o'tsin). */
+    private static PoseDetector.Person standingPerson(PoseDetector.Keypoint[] kp,
+                                                       double lShScore, double rShScore) {
+        kp[PoseDetector.L_SHOULDER] = new PoseDetector.Keypoint(0.30, 0.40, lShScore);
+        kp[PoseDetector.R_SHOULDER] = new PoseDetector.Keypoint(0.30, 0.60, rShScore);
+        kp[PoseDetector.L_HIP]      = new PoseDetector.Keypoint(0.60, 0.40, 0.80);
+        kp[PoseDetector.R_HIP]      = new PoseDetector.Keypoint(0.60, 0.60, 0.80);
+        return new PoseDetector.Person(kp, 0.90);
+    }
+
+    @Test
+    void frontKeypoints_passesPoseCheck() {
+        PoseDetector.Keypoint[] kp = buildKp();
+        // Kuchli yuz signallari (old tomondan)
+        kp[PoseDetector.NOSE]  = new PoseDetector.Keypoint(0.10, 0.50, 0.90);
+        kp[PoseDetector.L_EYE] = new PoseDetector.Keypoint(0.10, 0.45, 0.90);
+        kp[PoseDetector.R_EYE] = new PoseDetector.Keypoint(0.10, 0.55, 0.90);
+        kp[PoseDetector.L_EAR] = new PoseDetector.Keypoint(0.10, 0.40, 0.10);
+        kp[PoseDetector.R_EAR] = new PoseDetector.Keypoint(0.10, 0.60, 0.10);
+        PoseDetector.Person person = standingPerson(kp, 0.80, 0.80);
+
+        // detectFacing: votes=0 → FRONT
+        ImageCheckService.Facing facing = ImageCheckService.detectFacing(kp, 0.5, 0.4, 0.3);
+        assertThat(facing).isEqualTo(ImageCheckService.Facing.FRONT);
+
+        CheckItem result = imageCheckService.poseCheck(person, 0.30);
+        assertThat(result.status()).isEqualTo(CheckItem.PASS);
+        assertThat(result.id()).isEqualTo("pose");
+    }
+
+    @Test
+    void backKeypoints_failsPoseCheckWithPoseCode() {
+        PoseDetector.Keypoint[] kp = buildKp();
+        // Zaif yuz, kuchli quloqlar (orqa tomondan)
+        kp[PoseDetector.NOSE]  = new PoseDetector.Keypoint(0.10, 0.50, 0.10);
+        kp[PoseDetector.L_EYE] = new PoseDetector.Keypoint(0.10, 0.45, 0.10);
+        kp[PoseDetector.R_EYE] = new PoseDetector.Keypoint(0.10, 0.55, 0.10);
+        kp[PoseDetector.L_EAR] = new PoseDetector.Keypoint(0.10, 0.40, 0.80);
+        kp[PoseDetector.R_EAR] = new PoseDetector.Keypoint(0.10, 0.60, 0.80);
+        PoseDetector.Person person = standingPerson(kp, 0.80, 0.80);
+
+        // detectFacing: 3 ovoz → BACK
+        ImageCheckService.Facing facing = ImageCheckService.detectFacing(kp, 0.5, 0.4, 0.3);
+        assertThat(facing).isEqualTo(ImageCheckService.Facing.BACK);
+
+        CheckItem result = imageCheckService.poseCheck(person, 0.30);
+        assertThat(result.status()).isEqualTo(CheckItem.FAIL);
+        assertThat(result.id()).isEqualTo("pose");
+    }
+
+    @Test
+    void sideKeypoints_warnsPoseCheck() {
+        PoseDetector.Keypoint[] kp = buildKp();
+        // Kuchli yuz (orqa ovozlari yo'q), lekin faqat bir yelka ko'rinadi
+        kp[PoseDetector.NOSE]  = new PoseDetector.Keypoint(0.10, 0.50, 0.90);
+        kp[PoseDetector.L_EYE] = new PoseDetector.Keypoint(0.10, 0.45, 0.90);
+        kp[PoseDetector.R_EYE] = new PoseDetector.Keypoint(0.10, 0.55, 0.90);
+        kp[PoseDetector.L_EAR] = new PoseDetector.Keypoint(0.10, 0.40, 0.10);
+        kp[PoseDetector.R_EAR] = new PoseDetector.Keypoint(0.10, 0.60, 0.10);
+        // Faqat chap yelka ko'rinadi (o'ng yelka score < kmin=0.30)
+        PoseDetector.Person person = standingPerson(kp, 0.80, 0.05);
+
+        CheckItem result = imageCheckService.poseCheck(person, 0.30);
+        assertThat(result.status()).isEqualTo(CheckItem.WARN);
+        assertThat(result.id()).isEqualTo("pose");
     }
 }

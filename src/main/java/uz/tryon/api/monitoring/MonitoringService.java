@@ -1,9 +1,11 @@
 package uz.tryon.api.monitoring;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.tryon.api.auth.ApiKey;
 import uz.tryon.api.auth.ApiKeyRepository;
+import uz.tryon.api.wallet.CreditTransaction;
 import uz.tryon.api.wallet.CreditTransactionRepository;
 import uz.tryon.api.wallet.Wallet;
 import uz.tryon.api.wallet.WalletRepository;
@@ -127,6 +129,54 @@ public class MonitoringService {
                         r.getSpentMsim() / 1000.0))
                 .toList();
         return new History(items, total, safeLimit, safeOffset);
+    }
+
+    // ---- Partner self-stats ----
+
+    public record PartnerStats(String period, PartnerRequests requests,
+                               double creditsSpentSim, double balanceSim,
+                               List<PartnerTopKey> topKeys, List<PartnerActivity> recentActivity) {}
+
+    public record PartnerRequests(long total, long success, long failed) {}
+
+    public record PartnerTopKey(String keyId, String name, long requests) {}
+
+    public record PartnerActivity(Instant ts, String type, String status) {}
+
+    @Transactional(readOnly = true)
+    public PartnerStats partnerStats(UUID clientId) {
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+
+        long total = txRepo.countDebitsSince(clientId, since);
+        long failed = txRepo.countFailedDebitsSince(clientId, since);
+        long success = total - failed;
+        double spent = txRepo.sumDebitMsimSince(clientId, since) / 1000.0;
+        double balance = wallets.findById(clientId).map(Wallet::getBalanceMsim).orElse(0L) / 1000.0;
+
+        // Kalit nomlari qidiruvi
+        Map<UUID, String> keyNames = new HashMap<>();
+        for (ApiKey k : apiKeys.findByClientIdOrderByCreatedAtDesc(clientId)) {
+            keyNames.put(k.getId(), k.getName());
+        }
+        List<PartnerTopKey> topKeys = txRepo.aggregateDebitByKeySince(clientId, since).stream()
+                .limit(5)
+                .map(r -> new PartnerTopKey(
+                        r.getApiKeyId().toString(),
+                        keyNames.getOrDefault(r.getApiKeyId(), "Unknown"),
+                        r.getRequests()))
+                .toList();
+
+        List<PartnerActivity> recentActivity =
+                txRepo.findRecentTryonDebits(clientId, PageRequest.of(0, 10)).stream()
+                        .map(t -> new PartnerActivity(
+                                t.getCreatedAt(),
+                                "TRYON",
+                                (t.getMeta() == null || t.getMeta().isBlank()) ? "ok" : "error"))
+                        .toList();
+
+        return new PartnerStats("last_30_days",
+                new PartnerRequests(total, success, failed),
+                spent, balance, topKeys, recentActivity);
     }
 
     /**
