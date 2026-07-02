@@ -141,7 +141,7 @@ class CheckEndpointTest {
         PoseDetector.Person person = standingPerson(kp, 0.80, 0.80);
 
         // detectFacing: votes=0 → FRONT
-        ImageCheckService.Facing facing = ImageCheckService.detectFacing(kp, 0.5, 0.4, 0.3);
+        ImageCheckService.Facing facing = ImageCheckService.detectFacing(kp, 0.5, 0.4, 0.3, 0.3);
         assertThat(facing).isEqualTo(ImageCheckService.Facing.FRONT);
 
         CheckItem result = imageCheckService.poseCheck(person, 0.30);
@@ -161,7 +161,7 @@ class CheckEndpointTest {
         PoseDetector.Person person = standingPerson(kp, 0.80, 0.80);
 
         // detectFacing: 3 ovoz → BACK
-        ImageCheckService.Facing facing = ImageCheckService.detectFacing(kp, 0.5, 0.4, 0.3);
+        ImageCheckService.Facing facing = ImageCheckService.detectFacing(kp, 0.5, 0.4, 0.3, 0.3);
         assertThat(facing).isEqualTo(ImageCheckService.Facing.BACK);
 
         CheckItem result = imageCheckService.poseCheck(person, 0.30);

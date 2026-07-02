@@ -13,4 +13,7 @@ public interface ClientRepository extends JpaRepository<Client, UUID> {
 
     /** Barcha mijozlar, yangilardan eskiga (admin ro'yxati uchun). */
     java.util.List<Client> findAllByOrderByCreatedAtDesc();
+
+    /** Berilgan statusdagi mijozlar soni (masalan, countByStatus("ACTIVE")). */
+    long countByStatus(String status);
 }

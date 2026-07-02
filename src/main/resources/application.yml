@@ -39,6 +39,13 @@ spring:
   flyway:
     enabled: true
 
+# SENTRY_DSN — bo'sh bo'lsa Sentry to'liq o'chiq (dev default).
+sentry:
+  dsn: ${SENTRY_DSN:}
+  traces-sample-rate: 0.1
+  environment: ${SENTRY_ENV:production}
+  release: '@project.version@'
+
 tryon:
   # TRYON_MAINTENANCE — true bo'lsa /session, /check, /tryon 503 qaytaradi.
   maintenance: ${TRYON_MAINTENANCE:false}
@@ -112,6 +119,7 @@ tryon:
     face-ear-ratio-min: ${TRYON_CHECK_FACE_EAR_RATIO_MIN:0.5}
     eye-strong-threshold: ${TRYON_CHECK_EYE_STRONG:0.4}
     nose-strong-threshold: ${TRYON_CHECK_NOSE_STRONG:0.3}
+    shoulder-asymmetry-max: ${TRYON_CHECK_SH_ASYM:0.3}
 
 logging:
   level:

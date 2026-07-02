@@ -135,6 +135,8 @@ public class AppConfig {
         private double eyeStrongThreshold = 0.4;
         /** Burun kuchi chegarasi — orqa aniqlash uchun. */
         private double noseStrongThreshold = 0.3;
+        /** Yelka simmetriyasi maksimal farqi — yon tomondan aniqlash uchun. */
+        private double shoulderAsymmetryMax = 0.3;
 
         public double getFaceEarRatioMin() { return faceEarRatioMin; }
         public void setFaceEarRatioMin(double v) { this.faceEarRatioMin = v; }
@@ -144,6 +146,9 @@ public class AppConfig {
 
         public double getNoseStrongThreshold() { return noseStrongThreshold; }
         public void setNoseStrongThreshold(double v) { this.noseStrongThreshold = v; }
+
+        public double getShoulderAsymmetryMax() { return shoulderAsymmetryMax; }
+        public void setShoulderAsymmetryMax(double v) { this.shoulderAsymmetryMax = v; }
     }
 
     public String getModalUrl() { return modalUrl; }

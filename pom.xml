@@ -93,6 +93,13 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
+        <!-- Sentry — xatolarni kuzatish (SENTRY_DSN bo'sh bo'lsa o'chiq) -->
+        <dependency>
+            <groupId>io.sentry</groupId>
+            <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
+            <version>8.16.0</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>com.h2database</groupId>

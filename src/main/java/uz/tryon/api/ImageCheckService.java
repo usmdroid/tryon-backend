@@ -205,26 +205,30 @@ public class ImageCheckService {
     enum Facing { FRONT, SIDE, BACK, UNCERTAIN }
 
     /**
-     * Uch signalli ovoz berish orqali yuzlanishni aniqlaydi.
-     * Package-private + static — testlarda bevosita chaqirish uchun.
+     * To'rt signalli ovoz berish orqali yuzlanishni aniqlaydi.
+     * Package-private + static — testlarda bevosita chaqirish uchun (ONNX shart emas).
      *
-     * Signal 1 (face_vs_ear_ratio): yuz_avg / quloq_avg < faceEarRatioMin → orqa ovoz
+     * Signal 1 (face_vs_ear_ratio): yuz_avg / max(quloq_avg, 0.01) < faceEarRatioMin → orqa ovoz
      * Signal 2 (strong_eyes_count): kuchli ko'z soni == 0 → orqa ovoz
      * Signal 3 (nose_high_confidence): burun score < noseStrongThreshold → orqa ovoz
+     * Signal 4 (shoulder_symmetry): |L_yelka - R_yelka| > shoulderAsymmetryMax → yon ovoz
      *
-     * votes>=2 → BACK; votes==1 → UNCERTAIN; votes==0 → FRONT
+     * backVotes>=2 → BACK; backVotes==1 → UNCERTAIN;
+     * sideVotes>=1 && backVotes==0 → SIDE; else → FRONT
      */
     static Facing detectFacing(Keypoint[] kp,
                                 double faceEarRatioMin,
                                 double eyeStrongThreshold,
-                                double noseStrongThreshold) {
+                                double noseStrongThreshold,
+                                double shoulderAsymmetryMax) {
         double faceAvg = (kp[NOSE].score() + kp[L_EYE].score() + kp[R_EYE].score()) / 3.0;
         double earAvg  = (kp[L_EAR].score() + kp[R_EAR].score()) / 2.0;
 
         int backVotes = 0;
 
         // Signal 1: yuz/quloq nisbati
-        if (earAvg > 1e-6 && faceAvg / earAvg < faceEarRatioMin) backVotes++;
+        double ratio = faceAvg / Math.max(earAvg, 0.01);
+        if (ratio < faceEarRatioMin) backVotes++;
 
         // Signal 2: kuchli ko'z soni
         int strongEyes = 0;
@@ -235,15 +239,22 @@ public class ImageCheckService {
         // Signal 3: burun ishonchi
         if (kp[NOSE].score() < noseStrongThreshold) backVotes++;
 
+        // Signal 4: yelka simmetriyasi → yon ovoz (orqa ovoz emas)
+        int sideVotes = 0;
+        double shDiff = Math.abs(kp[L_SHOULDER].score() - kp[R_SHOULDER].score());
+        if (shDiff > shoulderAsymmetryMax) sideVotes++;
+
         if (backVotes >= 2) return Facing.BACK;
         if (backVotes == 1) return Facing.UNCERTAIN;
+        if (sideVotes >= 1) return Facing.SIDE;
         return Facing.FRONT;
     }
 
     private Facing detectFacing(Person p, double k) {
         var c = config.getCheck();
         return detectFacing(p.keypoints(),
-                c.getFaceEarRatioMin(), c.getEyeStrongThreshold(), c.getNoseStrongThreshold());
+                c.getFaceEarRatioMin(), c.getEyeStrongThreshold(), c.getNoseStrongThreshold(),
+                c.getShoulderAsymmetryMax());
     }
 
     /** Tik turibdimi / yotmaganmi / old tomondanmi. Package-private — testlarda chaqirish uchun. */
@@ -271,18 +282,22 @@ public class ImageCheckService {
                     "Odam tik turmagan (yotgan yoki kuchli egilgan) ko'rinadi.");
         }
 
-        // 2. Ko'p signalli orqa-yuzlanish ovoz berish
+        // 2. Ko'p signalli orqa/yon yuzlanish ovoz berish
         Facing facing = detectFacing(p, k);
         if (facing == Facing.BACK) {
             return CheckItem.fail("pose", "Poza",
-                    "Orqasi bilan turgan ko'rinadi. Kiyimni to'g'ri sinash uchun old tomondan turing.");
+                    "Orqasi bilan turmang — old tomondan suratga oling.");
+        }
+        if (facing == Facing.SIDE) {
+            return CheckItem.warn("pose", "Poza",
+                    "Yon tomondan turgan ko'rinadi. Old tomondan turish tavsiya etiladi.");
         }
         if (facing == Facing.UNCERTAIN) {
             return CheckItem.warn("pose", "Poza",
                     "Yuz aniq ko'rinmadi (yon yoki yarim-orqa). Old tomondan va yorug' joyda turing.");
         }
 
-        // 3. Yon tomondan (bir yelka ko'rinadi)
+        // 3. Yon tomondan (bir yelka ko'rinadi — geometrik tekshiruv)
         if (shoulders == 1) {
             return CheckItem.warn("pose", "Poza",
                     "Yon tomondan turgan ko'rinadi. Old tomondan turish tavsiya etiladi.");
