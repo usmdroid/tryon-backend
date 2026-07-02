@@ -38,6 +38,9 @@ public class CreditTransaction {
     @Column(name = "api_key_id")
     private UUID apiKeyId;
 
+    @Column(name = "moderation_status", nullable = false, length = 20)
+    private String moderationStatus = "VISIBLE";
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -68,5 +71,8 @@ public class CreditTransaction {
     public long getBalanceAfterMsim() { return balanceAfterMsim; }
     public String getMeta() { return meta; }
     public UUID getApiKeyId() { return apiKeyId; }
+    public String getModerationStatus() { return moderationStatus; }
     public Instant getCreatedAt() { return createdAt; }
+
+    public void setModerationStatus(String moderationStatus) { this.moderationStatus = moderationStatus; }
 }

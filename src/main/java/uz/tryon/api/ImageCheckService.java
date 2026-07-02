@@ -198,6 +198,9 @@ public class ImageCheckService {
             return;
         }
 
+        if (config.getCheck().isDebug()) {
+            checks.add(buildDebugItem(subject.keypoints()));
+        }
         if (add(checks, poseCheck(subject, kmin))) return; // poza fail → tana ko'rinishi o'tkazib yuboriladi
         checks.add(coverageCheck(subject, clothType, kmin));
     }
@@ -244,10 +247,18 @@ public class ImageCheckService {
         double shDiff = Math.abs(kp[L_SHOULDER].score() - kp[R_SHOULDER].score());
         if (shDiff > shoulderAsymmetryMax) sideVotes++;
 
-        if (backVotes >= 2) return Facing.BACK;
-        if (backVotes == 1) return Facing.UNCERTAIN;
-        if (sideVotes >= 1) return Facing.SIDE;
-        return Facing.FRONT;
+        Facing facing;
+        if (backVotes >= 2) facing = Facing.BACK;
+        else if (backVotes == 1) facing = Facing.UNCERTAIN;
+        else if (sideVotes >= 1) facing = Facing.SIDE;
+        else facing = Facing.FRONT;
+
+        log.debug("detectFacing: nose={} eyesL={} eyesR={} earsL={} earsR={} faceAvg={} earAvg={} ratio={} backVotes={} sideVotes={} facing={}",
+                kp[NOSE].score(), kp[L_EYE].score(), kp[R_EYE].score(),
+                kp[L_EAR].score(), kp[R_EAR].score(),
+                faceAvg, earAvg, ratio, backVotes, sideVotes, facing);
+
+        return facing;
     }
 
     private Facing detectFacing(Person p, double k) {
@@ -255,6 +266,36 @@ public class ImageCheckService {
         return detectFacing(p.keypoints(),
                 c.getFaceEarRatioMin(), c.getEyeStrongThreshold(), c.getNoseStrongThreshold(),
                 c.getShoulderAsymmetryMax());
+    }
+
+    private CheckItem buildDebugItem(Keypoint[] kp) {
+        var c = config.getCheck();
+        double nose = kp[NOSE].score();
+        double eyeL = kp[L_EYE].score();
+        double eyeR = kp[R_EYE].score();
+        double earL = kp[L_EAR].score();
+        double earR = kp[R_EAR].score();
+        double faceAvg = (nose + eyeL + eyeR) / 3.0;
+        double earAvg  = (earL + earR) / 2.0;
+        double ratio   = faceAvg / Math.max(earAvg, 0.01);
+        int backVotes = 0;
+        if (ratio < c.getFaceEarRatioMin()) backVotes++;
+        int strongEyes = 0;
+        if (eyeL >= c.getEyeStrongThreshold()) strongEyes++;
+        if (eyeR >= c.getEyeStrongThreshold()) strongEyes++;
+        if (strongEyes == 0) backVotes++;
+        if (nose < c.getNoseStrongThreshold()) backVotes++;
+        int sideVotes = 0;
+        if (Math.abs(kp[L_SHOULDER].score() - kp[R_SHOULDER].score()) > c.getShoulderAsymmetryMax()) sideVotes++;
+        Facing facing;
+        if (backVotes >= 2) facing = Facing.BACK;
+        else if (backVotes == 1) facing = Facing.UNCERTAIN;
+        else if (sideVotes >= 1) facing = Facing.SIDE;
+        else facing = Facing.FRONT;
+        String msg = String.format(
+                "nose=%.2f eyesL=%.2f eyesR=%.2f earsL=%.2f earsR=%.2f faceAvg=%.2f earAvg=%.2f ratio=%.2f backVotes=%d sideVotes=%d facing=%s",
+                nose, eyeL, eyeR, earL, earR, faceAvg, earAvg, ratio, backVotes, sideVotes, facing);
+        return CheckItem.skip("pose_debug", "Debug", msg);
     }
 
     /** Tik turibdimi / yotmaganmi / old tomondanmi. Package-private — testlarda chaqirish uchun. */

@@ -1,6 +1,10 @@
 package uz.tryon.api;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static uz.tryon.api.PoseDetector.*;
@@ -152,5 +156,44 @@ class FacingDetectionTest {
         kp[R_SHOULDER] = new PoseDetector.Keypoint(0.30, 0.60, 0.10);
         // Signal 2+3: backVotes=2 → BACK (yon signali e'tiborga olinmaydi)
         assertThat(detect(kp)).isEqualTo(ImageCheckService.Facing.BACK);
+    }
+
+    // ---- Fixture-based tests (docs/test-poses/*.json) ----
+
+    @Test
+    void fixture_back_returnsBACK() throws Exception {
+        assertThat(detect(loadFixture("docs/test-poses/back.json")))
+                .isEqualTo(ImageCheckService.Facing.BACK);
+    }
+
+    @Test
+    void fixture_front_returnsFRONT() throws Exception {
+        assertThat(detect(loadFixture("docs/test-poses/front.json")))
+                .isEqualTo(ImageCheckService.Facing.FRONT);
+    }
+
+    @Test
+    void fixture_side_left_returnsSIDE() throws Exception {
+        assertThat(detect(loadFixture("docs/test-poses/side-left.json")))
+                .isEqualTo(ImageCheckService.Facing.SIDE);
+    }
+
+    @Test
+    void fixture_side_right_returnsSIDE() throws Exception {
+        assertThat(detect(loadFixture("docs/test-poses/side-right.json")))
+                .isEqualTo(ImageCheckService.Facing.SIDE);
+    }
+
+    /** MoveNet index order: 0=nose 1=left_eye 2=right_eye 3=left_ear 4=right_ear 5=left_shoulder 6=right_shoulder ... */
+    private static PoseDetector.Keypoint[] loadFixture(String path) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(Path.of(path).toFile());
+        JsonNode arr = root.get("keypoints");
+        PoseDetector.Keypoint[] kp = new PoseDetector.Keypoint[17];
+        for (int i = 0; i < 17; i++) {
+            JsonNode kn = arr.get(i);
+            kp[i] = new PoseDetector.Keypoint(kn.get("y").asDouble(), kn.get("x").asDouble(), kn.get("score").asDouble());
+        }
+        return kp;
     }
 }

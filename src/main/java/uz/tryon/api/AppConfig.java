@@ -149,6 +149,11 @@ public class AppConfig {
 
         public double getShoulderAsymmetryMax() { return shoulderAsymmetryMax; }
         public void setShoulderAsymmetryMax(double v) { this.shoulderAsymmetryMax = v; }
+
+        /** Debug rejimi: true bo'lsa /api/check javobi ichida poza signallari qo'shimcha CheckItem sifatida keladi. */
+        private boolean debug = false;
+        public boolean isDebug() { return debug; }
+        public void setDebug(boolean v) { this.debug = v; }
     }
 
     public String getModalUrl() { return modalUrl; }

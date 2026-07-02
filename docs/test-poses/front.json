@@ -1,0 +1,22 @@
+{
+  "pose": "front",
+  "keypoints": [
+    { "name": "nose",           "y": 0.12, "x": 0.50, "score": 0.90 },
+    { "name": "left_eye",       "y": 0.11, "x": 0.47, "score": 0.85 },
+    { "name": "right_eye",      "y": 0.11, "x": 0.53, "score": 0.87 },
+    { "name": "left_ear",       "y": 0.12, "x": 0.42, "score": 0.08 },
+    { "name": "right_ear",      "y": 0.12, "x": 0.58, "score": 0.12 },
+    { "name": "left_shoulder",  "y": 0.28, "x": 0.38, "score": 0.80 },
+    { "name": "right_shoulder", "y": 0.28, "x": 0.62, "score": 0.80 },
+    { "name": "left_elbow",     "y": 0.42, "x": 0.32, "score": 0.75 },
+    { "name": "right_elbow",    "y": 0.42, "x": 0.68, "score": 0.75 },
+    { "name": "left_wrist",     "y": 0.55, "x": 0.30, "score": 0.70 },
+    { "name": "right_wrist",    "y": 0.55, "x": 0.70, "score": 0.70 },
+    { "name": "left_hip",       "y": 0.55, "x": 0.42, "score": 0.80 },
+    { "name": "right_hip",      "y": 0.55, "x": 0.58, "score": 0.80 },
+    { "name": "left_knee",      "y": 0.72, "x": 0.42, "score": 0.75 },
+    { "name": "right_knee",     "y": 0.72, "x": 0.58, "score": 0.75 },
+    { "name": "left_ankle",     "y": 0.88, "x": 0.42, "score": 0.70 },
+    { "name": "right_ankle",    "y": 0.88, "x": 0.58, "score": 0.70 }
+  ]
+}

@@ -120,6 +120,7 @@ tryon:
     eye-strong-threshold: ${TRYON_CHECK_EYE_STRONG:0.4}
     nose-strong-threshold: ${TRYON_CHECK_NOSE_STRONG:0.3}
     shoulder-asymmetry-max: ${TRYON_CHECK_SH_ASYM:0.3}
+    debug: ${TRYON_CHECK_DEBUG:false}
 
 logging:
   level:

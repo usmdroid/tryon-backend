@@ -154,6 +154,31 @@ public interface CreditTransactionRepository extends JpaRepository<CreditTransac
     List<TimeBucketRow> globalTimeseries(@Param("bucket") String bucket,
                                          @Param("since") Instant since);
 
+    // ---- Admin Moderation (credit_transactions.moderation_status bilan filtrlash) ----
+
+    /**
+     * Moderation ro'yxati: barcha yoki bitta holat bo'yicha filtr. Object[] qaytariladi —
+     * H2 va PostgreSQL turli temporal tiplar qaytarganligi uchun proyeksiya ishlatilmaydi.
+     * Ustunlar tartibi: [0]id(String), [1]client_id(String), [2]client_name,
+     * [3]type, [4]amount_msim, [5]moderation_status, [6]meta, [7]created_at.
+     */
+    @Query(value = "SELECT CAST(t.id AS VARCHAR), CAST(t.client_id AS VARCHAR), "
+            + "c.name, t.type, t.amount_msim, t.moderation_status, t.meta, "
+            + "CAST(t.created_at AS VARCHAR) "
+            + "FROM credit_transactions t LEFT JOIN clients c ON c.id = t.client_id "
+            + "WHERE (CAST(:status AS varchar) IS NULL OR t.moderation_status = CAST(:status AS varchar)) "
+            + "ORDER BY t.created_at DESC "
+            + "LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Object[]> findModerationRows(@Param("status") String status,
+                                      @Param("limit") int limit,
+                                      @Param("offset") int offset);
+
+    /** Moderation filtr bo'yicha jami qatorlar soni (sahifalash uchun). */
+    @Query(value = "SELECT COUNT(*) FROM credit_transactions t "
+            + "WHERE (CAST(:status AS varchar) IS NULL OR t.moderation_status = CAST(:status AS varchar))",
+            nativeQuery = true)
+    long countModerationRows(@Param("status") String status);
+
     /** Global top client qatori proyeksiyasi. */
     interface GlobalTopClientRow {
         UUID getClientId();
