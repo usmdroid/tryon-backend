@@ -229,7 +229,9 @@ public class TryOnController {
         }
 
         // 7. Modal'ga uzatish
+        long gpuStartNs = System.nanoTime();
         ModalClient.Result result = modal.generate(person, cloth, clothType);
+        long gpuMs = (System.nanoTime() - gpuStartNs) / 1_000_000L;
 
         // 8. Telemetry voqeasini yozish (partner_id ma'lum bo'lsa — har ikki natija uchun)
         if (ctx != null) {
@@ -246,7 +248,7 @@ public class TryOnController {
                     productId, safeProductName, clothType,
                     result.ok() ? "success" : "fail",
                     result.ok() ? null : truncate(result.error(), 255),
-                    durationMs, clientIp, isEmulator);
+                    durationMs, clientIp, isEmulator, gpuMs);
         }
 
         if (!result.ok()) {

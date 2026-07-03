@@ -51,12 +51,15 @@ public class TryOnEvent {
     @Column(name = "emulator", nullable = false)
     private boolean emulator;
 
+    @Column(name = "gpu_ms")
+    private Long gpuMs;
+
     protected TryOnEvent() {}
 
     public TryOnEvent(String platform, String origin, UUID partnerId, String deviceId,
                       String productId, String productName, String clothType,
                       String result, String failReason, Long durationMs, String clientIp,
-                      boolean emulator) {
+                      boolean emulator, Long gpuMs) {
         this.ts = Instant.now();
         this.platform = platform;
         this.origin = origin;
@@ -70,6 +73,7 @@ public class TryOnEvent {
         this.durationMs = durationMs;
         this.clientIp = clientIp;
         this.emulator = emulator;
+        this.gpuMs = gpuMs;
     }
 
     public UUID getId() { return id; }
@@ -86,4 +90,5 @@ public class TryOnEvent {
     public Long getDurationMs() { return durationMs; }
     public String getClientIp() { return clientIp; }
     public boolean isEmulator() { return emulator; }
+    public Long getGpuMs() { return gpuMs; }
 }

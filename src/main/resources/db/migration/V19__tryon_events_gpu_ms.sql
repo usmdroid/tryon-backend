@@ -1,0 +1,1 @@
+ALTER TABLE tryon_events ADD COLUMN gpu_ms BIGINT NULL;

@@ -30,10 +30,10 @@ public class TryOnEventService {
     public void record(String platform, String origin, UUID partnerId, String deviceId,
                        String productId, String productName, String clothType,
                        String result, String failReason, long durationMs, String clientIp,
-                       boolean emulator) {
+                       boolean emulator, Long gpuMs) {
         repo.save(new TryOnEvent(platform, origin, partnerId, deviceId,
                 productId, productName, clothType, result, failReason, durationMs, clientIp,
-                emulator));
+                emulator, gpuMs));
     }
 
     @Transactional(readOnly = true)
