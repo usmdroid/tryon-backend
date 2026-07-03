@@ -117,4 +117,15 @@ public interface TryOnEventRepository extends JpaRepository<TryOnEvent, UUID> {
         String getProductName();
         long getCount();
     }
+
+    /** GPU xarajat yig'indisi: muaffaqiyatli so'rovlar soni va jami davomiyligi. */
+    @Query(value = "SELECT COUNT(*) AS requestCount, SUM(duration_ms) AS totalDurationMs "
+            + "FROM tryon_events "
+            + "WHERE result = 'success' AND ts >= :from AND ts <= :to", nativeQuery = true)
+    GpuCostRow gpuCostAggregate(@Param("from") Instant from, @Param("to") Instant to);
+
+    interface GpuCostRow {
+        long getRequestCount();
+        Long getTotalDurationMs();
+    }
 }

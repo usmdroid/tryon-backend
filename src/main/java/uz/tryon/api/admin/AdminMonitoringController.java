@@ -1,16 +1,20 @@
 package uz.tryon.api.admin;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+import uz.tryon.api.telemetry.TryOnEventRepository;
 import uz.tryon.api.wallet.CreditTransactionRepository;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,12 +32,19 @@ import java.util.Map;
 @RequestMapping("/api/admin/monitoring")
 public class AdminMonitoringController {
 
+    // A10G GPU: $1.10/hr ÷ 3600 s/hr
+    private static final double GPU_USD_PER_SECOND = 0.000306;
+
     private final AdminAccessService access;
     private final CreditTransactionRepository txRepo;
+    private final TryOnEventRepository tryOnEventRepo;
 
-    public AdminMonitoringController(AdminAccessService access, CreditTransactionRepository txRepo) {
+    public AdminMonitoringController(AdminAccessService access,
+                                     CreditTransactionRepository txRepo,
+                                     TryOnEventRepository tryOnEventRepo) {
         this.access = access;
         this.txRepo = txRepo;
+        this.tryOnEventRepo = tryOnEventRepo;
     }
 
     @GetMapping("/global")
@@ -112,6 +123,37 @@ public class AdminMonitoringController {
         body.put("topClients", topClients);
         body.put("creditSpendTrend", creditSpendTrend);
         body.put("errorRate", errorRate);
+
+        return ResponseEntity.ok(body);
+    }
+
+    @GetMapping("/gpu-cost")
+    public ResponseEntity<?> gpuCost(
+            HttpServletRequest request,
+            @RequestParam String from,
+            @RequestParam String to) {
+
+        access.requireSuperAdmin(request);
+
+        Instant fromInstant;
+        Instant toInstant;
+        try {
+            fromInstant = Instant.parse(from);
+            toInstant   = Instant.parse(to);
+        } catch (DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from/to ISO8601 formatida bo'lishi shart.");
+        }
+
+        TryOnEventRepository.GpuCostRow row = tryOnEventRepo.gpuCostAggregate(fromInstant, toInstant);
+        long requestCount = row.getRequestCount();
+        long durationMs   = row.getTotalDurationMs() == null ? 0L : row.getTotalDurationMs();
+        double totalCostUsd = requestCount == 0 ? 0.0 : durationMs / 1000.0 * GPU_USD_PER_SECOND;
+        double avgCostUsd   = requestCount == 0 ? 0.0 : totalCostUsd / requestCount;
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("requestCount", requestCount);
+        body.put("totalCostUsd", totalCostUsd);
+        body.put("avgCostUsd", avgCostUsd);
 
         return ResponseEntity.ok(body);
     }
