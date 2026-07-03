@@ -56,6 +56,9 @@ tryon:
   # TRYON_MODAL_SECRET — Modal HMAC secret; prodda majburiy, bo'sh bo'lsa ilovа ishlamaydi.
   modal-secret: ${TRYON_MODAL_SECRET:}
 
+  # TRYON_MARKETPLACE_SECRET — bozor kanal tokeni imzolash siri; bo'sh = bozor kanali o'chiq.
+  marketplace-secret: ${TRYON_MARKETPLACE_SECRET:}
+
   # TRYON_API_KEYS — vergul bilan ajratilgan API kalitlar (legacy config kalitlar).
   api-keys: ${TRYON_API_KEYS:test-key-12345}
 

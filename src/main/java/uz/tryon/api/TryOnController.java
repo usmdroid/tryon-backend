@@ -7,8 +7,13 @@ import org.springframework.web.bind.annotation.*;
 import uz.tryon.api.auth.ApiKeyService;
 import uz.tryon.api.auth.Client;
 import uz.tryon.api.auth.ClientRepository;
+import uz.tryon.api.devsandbox.DevSandboxKeyService;
+import uz.tryon.api.telemetry.TryOnEventService;
+import uz.tryon.api.util.AuthHashUtils;
 import uz.tryon.api.wallet.CreditService;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
 
@@ -41,12 +46,16 @@ public class TryOnController {
     private final CreditService creditService;
     private final StorageService storageService;
     private final ClientRepository clientRepository;
+    private final TryOnEventService tryOnEventService;
+    private final DevSandboxKeyService devSandboxKeyService;
 
     public TryOnController(AppConfig config, RateLimiterService rateLimiter,
                            ImageValidator validator, ImageCheckService checkService,
                            ModalClient modal, TokenService tokenService,
                            ApiKeyService apiKeyService, CreditService creditService,
-                           StorageService storageService, ClientRepository clientRepository) {
+                           StorageService storageService, ClientRepository clientRepository,
+                           TryOnEventService tryOnEventService,
+                           DevSandboxKeyService devSandboxKeyService) {
         this.config = config;
         this.rateLimiter = rateLimiter;
         this.validator = validator;
@@ -57,6 +66,8 @@ public class TryOnController {
         this.creditService = creditService;
         this.storageService = storageService;
         this.clientRepository = clientRepository;
+        this.tryOnEventService = tryOnEventService;
+        this.devSandboxKeyService = devSandboxKeyService;
     }
 
     /**
@@ -116,9 +127,14 @@ public class TryOnController {
             @RequestHeader(value = "X-Api-Key", required = false) String apiKey,
             @RequestHeader(value = "Authorization", required = false) String auth,
             @RequestHeader(value = "Origin", required = false) String origin,
+            @RequestHeader(value = "X-Sima-Platform", required = false) String platform,
+            @RequestHeader(value = "X-Sima-Device-Id", required = false) String deviceId,
+            @RequestHeader(value = "X-Marketplace-Token", required = false) String marketplaceToken,
             @RequestBody Map<String, String> payload) {
 
+        long startMs = System.currentTimeMillis();
         if (config.isMaintenance()) return maintenance();
+
         // 1. Autentifikatsiya — Bearer token (bir martali) yoki X-Api-Key
         TokenService.Verified verified = authenticate(apiKey, auth, true);
         if (verified == null) {
@@ -126,27 +142,46 @@ public class TryOnController {
         }
         String clientId = verified.clientId();
 
-        // To'xtatilgan (SUSPENDED) mijoz so'rov yubora olmaydi.
-        if (isSuspended(clientId)) {
+        // Dev sandbox token detection: clientId encoded as "dev:{devKeyId}"
+        boolean isDevToken = clientId.startsWith("dev:");
+        UUID devKeyId = null;
+        if (isDevToken) {
+            devKeyId = tryParseUUID(clientId.substring(4));
+            if (devKeyId == null) {
+                return err(HttpStatus.UNAUTHORIZED, "Token yoki API kalit noto'g'ri, muddati o'tgan yoki ishlatilgan.");
+            }
+        }
+
+        // SUSPENDED check only applies to regular partner accounts
+        if (!isDevToken && isSuspended(clientId)) {
             return err(HttpStatus.FORBIDDEN, "Hisobingiz to'xtatilgan. Iltimos, qo'llab-quvvatlash xizmatiga murojaat qiling.");
         }
 
-        // 2. Origin (domain) allowlist — agar ro'yxat bo'sh bo'lmasa tekshiramiz
-        if (config.getAllowedOrigins() != null && !config.getAllowedOrigins().isEmpty()) {
+        // 2. Origin va partnerId aniqlash
+        final OriginContext ctx;
+        if (isDevToken) {
+            ctx = new OriginContext("dev_sandbox", devKeyId);
+        } else {
+            ctx = resolveOrigin(verified, marketplaceToken);
+        }
+
+        // 3. Origin (domain) allowlist — dev sandbox tokens bypass domain check
+        if (!isDevToken && config.getAllowedOrigins() != null && !config.getAllowedOrigins().isEmpty()) {
             if (origin == null || !config.getAllowedOrigins().contains(origin)) {
                 return err(HttpStatus.FORBIDDEN, "Bu domendan so'rovga ruxsat yo'q.");
             }
         }
 
-        // 3. Rate limit (clientId bo'yicha)
+        // 4. Rate limit (clientId bo'yicha)
         if (!rateLimiter.allow(clientId)) {
             return err(HttpStatus.TOO_MANY_REQUESTS, "So'rovlar chegarasi oshdi. Birozdan keyin urinib ko'ring.");
         }
 
-        // 4. Rasm validatsiyasi (ikkala rasm)
+        // 5. Rasm validatsiyasi (ikkala rasm)
         String person = payload.get("person_image");
         String cloth = payload.get("cloth_image");
         String clothType = payload.getOrDefault("cloth_type", "upper");
+        String productId = payload.get("product_id");
 
         ImageValidator.Result pv = validator.validate(person);
         if (!pv.ok()) return err(HttpStatus.BAD_REQUEST, "Shaxs rasmi: " + pv.reason());
@@ -154,10 +189,12 @@ public class TryOnController {
         ImageValidator.Result cv = validator.validate(cloth);
         if (!cv.ok()) return err(HttpStatus.BAD_REQUEST, "Kiyim rasmi: " + cv.reason());
 
-        // 5. Kredit tekshiruvi va yechish (faqat DB orqali ro'yxatdan o'tgan mijozlar uchun)
-        UUID clientUUID = tryParseUUID(clientId);
-        if (clientUUID != null) {
-            // Token ichidan kelgan API kalit id'si (mavjud bo'lsa) foydalanishni shu kalitga bog'laydi.
+        // 6. Kredit tekshiruvi va yechish
+        //    - marketplace kanali uchun o'tkazib yuboriladi
+        //    - dev sandbox uchun o'tkazib yuboriladi (used_count atomic increment below)
+        UUID clientUUID = isDevToken ? null : tryParseUUID(clientId);
+        boolean isMarketplace = ctx != null && "marketplace".equals(ctx.origin());
+        if (clientUUID != null && !isMarketplace) {
             UUID apiKeyUUID = tryParseUUID(verified.apiKeyId());
             try {
                 creditService.debitForTryOn(clientUUID, apiKeyUUID);
@@ -169,18 +206,41 @@ public class TryOnController {
             }
         }
 
-        // 6. Modal'ga uzatish
+        // 6b. Dev sandbox: atomically increment used_count (race-safe conditional UPDATE)
+        if (isDevToken) {
+            if (!devSandboxKeyService.tryIncrement(devKeyId)) {
+                return err(HttpStatus.PAYMENT_REQUIRED, "dev limit tugadi, yangi kalit oling");
+            }
+        }
+
+        // 7. Modal'ga uzatish
         ModalClient.Result result = modal.generate(person, cloth, clothType);
+
+        // 8. Telemetry voqeasini yozish (partner_id ma'lum bo'lsa — har ikki natija uchun)
+        if (ctx != null) {
+            String effectivePlatform = (platform != null && !platform.isBlank())
+                    ? platform.substring(0, Math.min(platform.length(), 16)) : "web";
+            String safeDeviceId = deviceId != null && deviceId.length() > 64
+                    ? deviceId.substring(0, 64) : deviceId;
+            long durationMs = System.currentTimeMillis() - startMs;
+            tryOnEventService.record(
+                    effectivePlatform, ctx.origin(), ctx.partnerId(), safeDeviceId,
+                    productId, clothType,
+                    result.ok() ? "success" : "fail",
+                    result.ok() ? null : truncate(result.error(), 255),
+                    durationMs);
+        }
+
         if (!result.ok()) {
             return err(HttpStatus.BAD_GATEWAY, result.error());
         }
 
-        // 7. Natijani R2'ga yuklash — fon ipida, javobni kechiktirmaydi (faqat ma'lum mijozlar uchun)
+        // 9. Natijani R2'ga yuklash — fon ipida, javobni kechiktirmaydi (faqat ma'lum mijozlar uchun)
         if (clientUUID != null) {
             storageService.uploadAsync(result.image(), clientUUID);
         }
 
-        // 8. Natija rasmni qaytarish (WebP)
+        // 10. Natija rasmni qaytarish (WebP)
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("image/webp"))
                 .body(result.image());
@@ -195,6 +255,7 @@ public class TryOnController {
      * Chiqish: CheckReport JSON (ok, checks[], summary).
      * <p>
      * GPU xarajati yo'q, shuning uchun rate limit qo'llanmaydi (faqat API kalit tekshiriladi).
+     * X-Sima-Platform, X-Sima-Device-Id, X-Marketplace-Token headerlari qabul qilinadi, e'tiborsiz qoldiriladi.
      */
     @PostMapping("/check")
     public ResponseEntity<?> check(
@@ -261,5 +322,61 @@ public class TryOnController {
                 .map(Client::getStatus)
                 .filter("SUSPENDED"::equals)
                 .isPresent();
+    }
+
+    /** Kanalning manba va partnerId kontekstini ifodalaydi. */
+    private record OriginContext(String origin, UUID partnerId) {}
+
+    /**
+     * So'rov kanalini aniqlaydi: marketplace yoki partner_site.
+     * Marketplace tokenni tekshiradi; aks holda clientId bo'yicha partner_site deb belgilanadi.
+     */
+    private OriginContext resolveOrigin(TokenService.Verified verified, String marketplaceTokenHeader) {
+        if (marketplaceTokenHeader != null && !config.getMarketplaceSecret().isBlank()) {
+            UUID partnerId = verifyMarketplaceToken(marketplaceTokenHeader);
+            if (partnerId != null) {
+                return new OriginContext("marketplace", partnerId);
+            }
+        }
+        UUID clientUUID = tryParseUUID(verified.clientId());
+        if (clientUUID != null) {
+            return new OriginContext("partner_site", clientUUID);
+        }
+        return null;
+    }
+
+    /**
+     * Marketplace tokenini tekshiradi va partnerId qaytaradi; yaroqsiz bo'lsa null.
+     * Token formati: base64url("marketplace|{partnerId}|{expMs}").base64url(hmac-sha256(secret, payload))
+     */
+    private UUID verifyMarketplaceToken(String token) {
+        if (token == null || token.isBlank()) return null;
+        int dot = token.indexOf('.');
+        if (dot <= 0 || dot == token.length() - 1) return null;
+        String payload;
+        try {
+            payload = new String(Base64.getUrlDecoder().decode(token.substring(0, dot)), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        String sig = token.substring(dot + 1);
+        if (!AuthHashUtils.constantTimeEquals(
+                sig, AuthHashUtils.b64Url(AuthHashUtils.hmacSha256(config.getMarketplaceSecret(), payload)))) {
+            return null;
+        }
+        String[] f = payload.split("\\|", 3);
+        if (f.length != 3 || !"marketplace".equals(f[0])) return null;
+        try {
+            long exp = Long.parseLong(f[2]);
+            if (System.currentTimeMillis() > exp) return null;
+            return UUID.fromString(f[1]);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null || s.length() <= max) return s;
+        return s.substring(0, max);
     }
 }

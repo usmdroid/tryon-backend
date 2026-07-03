@@ -27,6 +27,9 @@ public class RateLimiterService {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimiterService.class);
 
+    /** Dev sandbox public endpoint: max requests per minute per IP. */
+    private static final int DEV_SANDBOX_RATE_LIMIT_PER_MINUTE = 5;
+
     private final AppConfig config;
     private final StringRedisTemplate redisTemplate; // null = in-memory rejimi
     private final Map<String, Bucket> inMemoryBuckets = new ConcurrentHashMap<>();
@@ -63,6 +66,14 @@ public class RateLimiterService {
         return allowInMemory(clientId);
     }
 
+    /** Dev sandbox public endpoint: IP-based rate limiter (separate key prefix). */
+    public boolean allowDevSandboxIp(String ip) {
+        if (redisTemplate != null) {
+            return allowDevSandboxIpWithRedis(ip);
+        }
+        return allowDevSandboxIpInMemory(ip);
+    }
+
     private boolean allowWithRedis(String clientId) {
         // Kalit: daqiqa oynasi bo'yicha (fixed window)
         long window = System.currentTimeMillis() / 60_000L;
@@ -77,8 +88,26 @@ public class RateLimiterService {
         }
     }
 
+    private boolean allowDevSandboxIpWithRedis(String ip) {
+        long window = System.currentTimeMillis() / 60_000L;
+        String key = "ratelimit:devsandbox:ip:" + ip + ":" + window;
+        try {
+            Long count = redisTemplate.execute(RATE_SCRIPT, List.of(key));
+            return count != null && count <= DEV_SANDBOX_RATE_LIMIT_PER_MINUTE;
+        } catch (Exception e) {
+            log.error("Redis dev sandbox rate limit xatosi, in-memory ga o'tildi: {}", e.getMessage());
+            return allowDevSandboxIpInMemory(ip);
+        }
+    }
+
     private boolean allowInMemory(String clientId) {
         Bucket bucket = inMemoryBuckets.computeIfAbsent(clientId, k -> newBucket());
+        return bucket.tryConsume(1);
+    }
+
+    private boolean allowDevSandboxIpInMemory(String ip) {
+        String key = "devsandbox:" + ip;
+        Bucket bucket = inMemoryBuckets.computeIfAbsent(key, k -> newDevSandboxBucket());
         return bucket.tryConsume(1);
     }
 
@@ -86,6 +115,14 @@ public class RateLimiterService {
         Bandwidth limit = Bandwidth.builder()
                 .capacity(config.getRateLimitPerMinute())
                 .refillGreedy(config.getRateLimitPerMinute(), Duration.ofMinutes(1))
+                .build();
+        return Bucket.builder().addLimit(limit).build();
+    }
+
+    private Bucket newDevSandboxBucket() {
+        Bandwidth limit = Bandwidth.builder()
+                .capacity(DEV_SANDBOX_RATE_LIMIT_PER_MINUTE)
+                .refillGreedy(DEV_SANDBOX_RATE_LIMIT_PER_MINUTE, Duration.ofMinutes(1))
                 .build();
         return Bucket.builder().addLimit(limit).build();
     }

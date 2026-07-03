@@ -80,6 +80,9 @@ public class AppConfig {
     /** Texnik tanaffus — true bo'lsa /session, /check, /tryon endpoint'lari 503 qaytaradi (xotira tejash). */
     private boolean maintenance = false;
 
+    /** Bozor (marketplace) kanal tokeni imzolash siri. Bo'sh = bozor kanali o'chiq. */
+    private String marketplaceSecret = "";
+
     /** Sifat tekshiruvi chegaralari (POST /api/check uchun). */
     private final Check check = new Check();
 
@@ -200,6 +203,9 @@ public class AppConfig {
 
     public boolean isMaintenance() { return maintenance; }
     public void setMaintenance(boolean v) { this.maintenance = v; }
+
+    public String getMarketplaceSecret() { return marketplaceSecret; }
+    public void setMarketplaceSecret(String v) { this.marketplaceSecret = v; }
 
     public String getMailProvider() { return mailProvider; }
     public void setMailProvider(String v) { this.mailProvider = v; }
