@@ -36,7 +36,7 @@ public interface TryOnEventRepository extends JpaRepository<TryOnEvent, UUID> {
 
     /** Kun bo'yicha sahifalangan tarix. */
     @Query(value = "SELECT CAST(id AS VARCHAR) AS id, ts, platform, result, origin, "
-            + "product_id, cloth_type, fail_reason "
+            + "product_id, product_name, cloth_type, fail_reason, device_id, client_ip "
             + "FROM tryon_events "
             + "WHERE partner_id = CAST(:partnerId AS uuid) AND ts >= :from AND ts <= :to "
             + "  AND to_char(date_trunc('day', ts), 'YYYY-MM-DD') = :key "
@@ -58,7 +58,7 @@ public interface TryOnEventRepository extends JpaRepository<TryOnEvent, UUID> {
 
     /** Manba bo'yicha sahifalangan tarix. */
     @Query(value = "SELECT CAST(id AS VARCHAR) AS id, ts, platform, result, origin, "
-            + "product_id, cloth_type, fail_reason "
+            + "product_id, product_name, cloth_type, fail_reason, device_id, client_ip "
             + "FROM tryon_events "
             + "WHERE partner_id = CAST(:partnerId AS uuid) AND ts >= :from AND ts <= :to "
             + "  AND origin = :key "
@@ -94,7 +94,27 @@ public interface TryOnEventRepository extends JpaRepository<TryOnEvent, UUID> {
         String getResult();
         String getOrigin();
         String getProductId();
+        String getProductName();
         String getClothType();
         String getFailReason();
+        String getDeviceId();
+        String getClientIp();
+    }
+
+    /** Eng ko'p sinab ko'rilgan mahsulotlar (partner bo'yicha). */
+    @Query(value = "SELECT product_id AS productId, MAX(product_name) AS productName, COUNT(*) AS count "
+            + "FROM tryon_events "
+            + "WHERE partner_id = CAST(:partnerId AS uuid) AND ts >= :from AND ts <= :to "
+            + "  AND product_id IS NOT NULL AND product_id <> '' "
+            + "GROUP BY product_id ORDER BY count DESC LIMIT :limit", nativeQuery = true)
+    List<TopProductRow> topProducts(@Param("partnerId") UUID partnerId,
+                                     @Param("from") Instant from,
+                                     @Param("to") Instant to,
+                                     @Param("limit") int limit);
+
+    interface TopProductRow {
+        String getProductId();
+        String getProductName();
+        long getCount();
     }
 }

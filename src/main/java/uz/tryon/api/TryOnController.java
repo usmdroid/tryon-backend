@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import uz.tryon.api.admin.TryonFlagService;
 import uz.tryon.api.auth.ApiKeyService;
 import uz.tryon.api.auth.Client;
 import uz.tryon.api.auth.ClientRepository;
@@ -11,6 +12,8 @@ import uz.tryon.api.devsandbox.DevSandboxKeyService;
 import uz.tryon.api.telemetry.TryOnEventService;
 import uz.tryon.api.util.AuthHashUtils;
 import uz.tryon.api.wallet.CreditService;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -48,6 +51,7 @@ public class TryOnController {
     private final ClientRepository clientRepository;
     private final TryOnEventService tryOnEventService;
     private final DevSandboxKeyService devSandboxKeyService;
+    private final TryonFlagService tryonFlagService;
 
     public TryOnController(AppConfig config, RateLimiterService rateLimiter,
                            ImageValidator validator, ImageCheckService checkService,
@@ -55,7 +59,8 @@ public class TryOnController {
                            ApiKeyService apiKeyService, CreditService creditService,
                            StorageService storageService, ClientRepository clientRepository,
                            TryOnEventService tryOnEventService,
-                           DevSandboxKeyService devSandboxKeyService) {
+                           DevSandboxKeyService devSandboxKeyService,
+                           TryonFlagService tryonFlagService) {
         this.config = config;
         this.rateLimiter = rateLimiter;
         this.validator = validator;
@@ -68,6 +73,7 @@ public class TryOnController {
         this.clientRepository = clientRepository;
         this.tryOnEventService = tryOnEventService;
         this.devSandboxKeyService = devSandboxKeyService;
+        this.tryonFlagService = tryonFlagService;
     }
 
     /**
@@ -124,16 +130,19 @@ public class TryOnController {
 
     @PostMapping("/tryon")
     public ResponseEntity<?> tryOn(
+            HttpServletRequest request,
             @RequestHeader(value = "X-Api-Key", required = false) String apiKey,
             @RequestHeader(value = "Authorization", required = false) String auth,
             @RequestHeader(value = "Origin", required = false) String origin,
             @RequestHeader(value = "X-Sima-Platform", required = false) String platform,
             @RequestHeader(value = "X-Sima-Device-Id", required = false) String deviceId,
             @RequestHeader(value = "X-Marketplace-Token", required = false) String marketplaceToken,
+            @RequestHeader(value = "X-Sima-Emulator", required = false) String emulatorHeader,
             @RequestBody Map<String, String> payload) {
 
         long startMs = System.currentTimeMillis();
         if (config.isMaintenance()) return maintenance();
+        if (!tryonFlagService.isEnabled()) return tryonDisabled();
 
         // 1. Autentifikatsiya — Bearer token (bir martali) yoki X-Api-Key
         TokenService.Verified verified = authenticate(apiKey, auth, true);
@@ -182,6 +191,12 @@ public class TryOnController {
         String cloth = payload.get("cloth_image");
         String clothType = payload.getOrDefault("cloth_type", "upper");
         String productId = payload.get("product_id");
+        if (productId == null || productId.isBlank()) {
+            return err(HttpStatus.BAD_REQUEST, "product_id majburiy maydon.");
+        }
+        String productName = payload.get("product_name");
+
+        String clientIp = resolveClientIp(request);
 
         ImageValidator.Result pv = validator.validate(person);
         if (!pv.ok()) return err(HttpStatus.BAD_REQUEST, "Shaxs rasmi: " + pv.reason());
@@ -223,12 +238,15 @@ public class TryOnController {
             String safeDeviceId = deviceId != null && deviceId.length() > 64
                     ? deviceId.substring(0, 64) : deviceId;
             long durationMs = System.currentTimeMillis() - startMs;
+            String safeProductName = productName != null && productName.length() > 255
+                    ? productName.substring(0, 255) : productName;
+            boolean isEmulator = "true".equalsIgnoreCase(emulatorHeader);
             tryOnEventService.record(
                     effectivePlatform, ctx.origin(), ctx.partnerId(), safeDeviceId,
-                    productId, clothType,
+                    productId, safeProductName, clothType,
                     result.ok() ? "success" : "fail",
                     result.ok() ? null : truncate(result.error(), 255),
-                    durationMs);
+                    durationMs, clientIp, isEmulator);
         }
 
         if (!result.ok()) {
@@ -294,6 +312,12 @@ public class TryOnController {
     private ResponseEntity<Map<String, String>> maintenance() {
         return err(HttpStatus.SERVICE_UNAVAILABLE,
                 "Xizmat texnik tanaffusda. Iltimos, biroz keyin urinib ko'ring.");
+    }
+
+    /** TRYON_ENABLED = false — GPU kill switch faol. */
+    private ResponseEntity<Map<String, String>> tryonDisabled() {
+        return err(HttpStatus.SERVICE_UNAVAILABLE,
+                "Kiyib ko'rish xizmati vaqtincha to'xtatilgan. Tez orada qayta ishga tushadi.");
     }
 
     private ResponseEntity<Map<String, String>> err(HttpStatus status, String message) {
@@ -378,5 +402,14 @@ public class TryOnController {
     private static String truncate(String s, int max) {
         if (s == null || s.length() <= max) return s;
         return s.substring(0, max);
+    }
+
+    private static String resolveClientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
+        }
+        return request.getRemoteAddr();
     }
 }

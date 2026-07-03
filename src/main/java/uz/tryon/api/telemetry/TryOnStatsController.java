@@ -97,8 +97,12 @@ public class TryOnStatsController {
             m.put("result", it.result());
             m.put("origin", it.origin());
             m.put("productId", it.productId());
+            m.put("productName", it.productName());
+            m.put("product", it.productName() != null ? it.productName() : it.productId());
             m.put("clothType", it.clothType());
             m.put("failReason", it.failReason());
+            m.put("deviceIdShort", it.deviceIdShort());
+            m.put("ipMasked", it.ipMasked());
             return m;
         }).toList();
 
@@ -108,6 +112,35 @@ public class TryOnStatsController {
         body.put("limit", result.limit());
         body.put("offset", result.offset());
         return ResponseEntity.ok(body);
+    }
+
+    @GetMapping("/tryons/top-products")
+    public ResponseEntity<?> topProducts(
+            HttpServletRequest request,
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam(required = false, defaultValue = "10") int limit) {
+        Optional<String> clientIdOpt = authenticate(request);
+        if (clientIdOpt.isEmpty()) return unauthorized();
+
+        UUID partnerId = UUID.fromString(clientIdOpt.get());
+        List<TryOnEventService.TopProductEntry> entries;
+        try {
+            entries = eventService.topProducts(partnerId,
+                    Instant.parse(from), Instant.parse(to), limit);
+        } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
+            return err(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+
+        List<Map<String, Object>> rows = entries.stream().map(e -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("productId", e.productId());
+            m.put("productName", e.productName());
+            m.put("count", e.count());
+            return m;
+        }).toList();
+
+        return ResponseEntity.ok(rows);
     }
 
     private Optional<String> authenticate(HttpServletRequest req) {
